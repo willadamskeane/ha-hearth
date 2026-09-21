@@ -100,12 +100,17 @@
 		inset: 0;
 	}
 
-	/* One ordinary paint replaces five backdrop-filter passes on kiosk GPUs. */
+	/* One ordinary paint replaces five backdrop-filter passes on kiosk GPUs.
+	   It has to fade into the page background, not the surface token: surface
+	   is the ink side of the theme (near-white on the dark presets) and reads as
+	   a bright veil at this size, where a backdrop blur would only have deepened
+	   what is underneath. Declarations using color-mix are dropped whole by some
+	   older tablet webviews, which costs the band and nothing else. */
 	.edge > .fade {
 		background: linear-gradient(
 			var(--edge-toward),
 			transparent 0%,
-			rgb(var(--h-surface-rgb) / 0.72) 100%
+			color-mix(in srgb, var(--h-bg-1) 92%, transparent) 100%
 		);
 	}
 

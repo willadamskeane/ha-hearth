@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.7
+
+- Fade scroll edges into the page background in low-power mode instead of the surface token. The old fallback painted a 72%-opaque near-white veil over dark presets, which read as a glow across the bottom row rather than a hint that content continues.
+
 ## 0.1.6
 
 - Keep the room tabs on their own 12px inset instead of adding the container padding on top. The tab strip already bleeds past the layout's edge padding, so inheriting it pushed a pill off the end on a wall tablet.
