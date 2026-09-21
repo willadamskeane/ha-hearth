@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.3
+
+- Use the live Home Assistant frontend origin for Ingress authentication so secure-context proxies can reuse the frontend session without an origin mismatch or blocked OAuth redirect.
+
 ## 0.1.2
 
 - Reuse the authenticated Home Assistant frontend session when Hearth runs through Ingress, avoiding an OAuth redirect that Home Assistant rejects inside the Ingress iframe.

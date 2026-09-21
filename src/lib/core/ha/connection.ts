@@ -145,9 +145,16 @@ export async function authentication(
 			if (ingress && !(await activeTokenStorage.loadTokens())) {
 				throw new Error('The Home Assistant browser session is unavailable to Ingress');
 			}
+			// Ingress runs inside the authenticated Home Assistant frontend. The
+			// browser-facing origin can differ from the origin Supervisor forwards to
+			// the add-on (for example Kiosk Satellite's secure-context proxy). Use the
+			// actual frontend origin so getAuth accepts the shared hassTokens record and
+			// opens its WebSocket through the same proxy instead of starting OAuth in
+			// the iframe.
+			const hassUrl = ingress ? window.location.origin : configuration.hassUrl;
 			auth = await getAuth({
 				...activeTokenStorage,
-				hassUrl: configuration.hassUrl,
+				hassUrl,
 				...(ingress ? {} : { redirectUrl: `${window.location.origin}${window.location.pathname}` })
 			});
 			if (auth.expired) await auth.refreshAccessToken();

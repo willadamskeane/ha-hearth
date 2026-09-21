@@ -86,7 +86,7 @@ describe('authentication', () => {
 		const sharedTokens = {
 			access_token: 'existing-access-token',
 			refresh_token: 'existing-refresh-token',
-			hassUrl: 'https://example.ui.nabu.casa'
+			hassUrl: 'http://localhost:3000'
 		};
 		localStorage.setItem('hassTokens', JSON.stringify(sharedTokens));
 		const socket = {
@@ -95,7 +95,9 @@ describe('authentication', () => {
 			subscribeMessage: vi.fn(async () => async () => {})
 		} as unknown as Connection;
 		vi.mocked(getAuth).mockImplementation(async (options) => {
+			if (!options) throw new Error('expected getAuth options');
 			expect(await options.loadTokens?.()).toEqual(sharedTokens);
+			expect(options.hassUrl).toBe('http://localhost:3000');
 			expect(options.redirectUrl).toBeUndefined();
 			return { expired: false } as Auth;
 		});
