@@ -52,8 +52,12 @@
 			display: flex;
 			align-items: center;
 			gap: 8px;
+			/* the nav owns its inset: it bleeds past the layout's edge padding so
+			   the sticky gradient reaches the screen, and the pills keep their own
+			   12px instead of inheriting the container padding, which would push
+			   tabs off the strip on narrow screens */
 			margin: 0 calc(-1 * var(--h-pad-x));
-			padding: 8px calc(12px + var(--h-pad-x));
+			padding: 8px 12px;
 			background: linear-gradient(180deg, var(--h-bg-1) 70%, transparent);
 		}
 

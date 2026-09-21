@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.6
+
+- Keep the room tabs on their own 12px inset instead of adding the container padding on top. The tab strip already bleeds past the layout's edge padding, so inheriting it pushed a pill off the end on a wall tablet.
+
 ## 0.1.5
 
 - Hide the Home Assistant panel title bar above the Ingress frame so wall tablets get the full screen height. The frame now asks the hosting frontend to enter kiosk mode on start, which is the only supported way to remove chrome that Home Assistant draws in its own `ha-panel-app` shadow root.
