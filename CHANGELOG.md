@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.2
+
+- Reuse the authenticated Home Assistant frontend session when Hearth runs through Ingress, avoiding an OAuth redirect that Home Assistant rejects inside the Ingress iframe.
+- Keep standalone OAuth callbacks on the page that initiated authentication.
+
 ## 0.1.1
 
 - Keep the Supervisor-only Home Assistant hostname on the server side and derive the browser-facing URL from trusted Ingress headers.

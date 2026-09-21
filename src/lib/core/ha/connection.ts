@@ -57,28 +57,42 @@ export function subscribeHassTriggers(listener: TriggerListener): () => void {
 	return () => triggerListeners.delete(listener);
 }
 
-const tokenStorage = {
-	async loadTokens() {
-		try {
-			const raw = localStorage.hearthTokens;
-			// guard against a missing key or the literal "null"/"undefined" string
-			if (!raw || raw === 'null' || raw === 'undefined') return undefined;
-			const tokens = JSON.parse(raw);
-			// treat a value that isn't actually a token object as no tokens
-			if (!tokens?.access_token && !tokens?.refresh_token) return undefined;
-			return tokens;
-		} catch {
-			// corrupt json in localStorage, treat as no tokens
-			return undefined;
+function createTokenStorage(key: 'hearthTokens' | 'hassTokens', clearOnError = true) {
+	return {
+		async loadTokens() {
+			try {
+				const raw = localStorage.getItem(key);
+				// guard against a missing key or the literal "null"/"undefined" string
+				if (!raw || raw === 'null' || raw === 'undefined') return undefined;
+				const tokens = JSON.parse(raw);
+				// treat a value that isn't actually a token object as no tokens
+				if (!tokens?.access_token && !tokens?.refresh_token) return undefined;
+				return tokens;
+			} catch {
+				// corrupt json in localStorage, treat as no tokens
+				return undefined;
+			}
+		},
+		saveTokens(tokens: AuthData | null) {
+			localStorage.setItem(key, JSON.stringify(tokens));
+		},
+		clearTokens() {
+			if (clearOnError) localStorage.removeItem(key);
 		}
-	},
-	saveTokens(tokens: AuthData | null) {
-		localStorage.hearthTokens = JSON.stringify(tokens);
-	},
-	clearTokens() {
-		localStorage.removeItem('hearthTokens');
-	}
-};
+	};
+}
+
+const hearthTokenStorage = createTokenStorage('hearthTokens');
+// Home Assistant Ingress is same-origin with the parent frontend. Reuse that
+// authenticated browser session instead of starting an OAuth redirect inside
+// the iframe, which Home Assistant deliberately rejects for Ingress callbacks.
+// Do not clear the frontend's session when Hearth sees an auth error; the
+// frontend remains the owner of this shared token record.
+const ingressTokenStorage = createTokenStorage('hassTokens', false);
+
+function isIngressPage() {
+	return location.pathname.startsWith('/api/hassio_ingress/');
+}
 
 export interface ConnectionHooks {
 	/**
@@ -110,6 +124,7 @@ export async function authentication(
 	}
 
 	let auth: Auth | undefined;
+	let activeTokenStorage = hearthTokenStorage;
 
 	try {
 		if (configuration?.token) {
@@ -125,12 +140,15 @@ export async function authentication(
 			// the configuration supplies a long-lived token
 			throw new Error('A long-lived access token is required in the companion app');
 		} else {
+			const ingress = isIngressPage();
+			activeTokenStorage = ingress ? ingressTokenStorage : hearthTokenStorage;
+			if (ingress && !(await activeTokenStorage.loadTokens())) {
+				throw new Error('The Home Assistant browser session is unavailable to Ingress');
+			}
 			auth = await getAuth({
-				...tokenStorage,
+				...activeTokenStorage,
 				hassUrl: configuration.hassUrl,
-				// Always return to the Hearth page that initiated OAuth. This preserves
-				// per-installation Ingress paths and strips stale query parameters.
-				redirectUrl: `${window.location.origin}${window.location.pathname}`
+				...(ingress ? {} : { redirectUrl: `${window.location.origin}${window.location.pathname}` })
 			});
 			if (auth.expired) await auth.refreshAccessToken();
 		}
@@ -225,22 +243,22 @@ export async function authentication(
 		);
 	} catch (error) {
 		if (!isCurrent()) return;
-		handleError(error);
+		handleError(error, activeTokenStorage);
 	}
 }
 
-function handleError(error: unknown) {
+function handleError(error: unknown, activeTokenStorage = hearthTokenStorage) {
 	switch (error) {
 		case ERR_INVALID_AUTH:
 			console.error('ERR_INVALID_AUTH');
-			tokenStorage.clearTokens();
+			activeTokenStorage.clearTokens();
 			break;
 		case ERR_INVALID_AUTH_CALLBACK:
 			// raised by getAuth() when the auth callback state (client id /
 			// hass url) doesn't match, clear the stale tokens and query
 			// string so the next retry restarts the auth flow cleanly
 			console.error('ERR_INVALID_AUTH_CALLBACK');
-			tokenStorage.clearTokens();
+			activeTokenStorage.clearTokens();
 			if (location.search.includes('auth_callback=1')) {
 				history.replaceState(null, '', location.pathname);
 			}

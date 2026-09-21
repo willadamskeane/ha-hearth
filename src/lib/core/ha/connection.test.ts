@@ -1,6 +1,12 @@
 import { get } from 'svelte/store';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createConnection, getAuth, type Auth, type Connection } from 'home-assistant-js-websocket';
+import {
+	createConnection,
+	ERR_INVALID_AUTH,
+	getAuth,
+	type Auth,
+	type Connection
+} from 'home-assistant-js-websocket';
 import {
 	authentication,
 	connected,
@@ -23,6 +29,8 @@ afterEach(() => {
 	stopConnection();
 	vi.useRealTimers();
 	vi.clearAllMocks();
+	localStorage.clear();
+	window.history.replaceState(null, '', '/');
 });
 
 describe('authentication', () => {
@@ -53,8 +61,8 @@ describe('authentication', () => {
 		expect(get(connected)).toBe(false);
 	});
 
-	it('returns OAuth to the current Hearth path', async () => {
-		window.history.replaceState(null, '', '/api/hassio_ingress/session-token/');
+	it('returns standalone OAuth to the current Hearth path', async () => {
+		window.history.replaceState(null, '', '/hearth/');
 		const socket = {
 			close: vi.fn(),
 			addEventListener: vi.fn(),
@@ -68,8 +76,62 @@ describe('authentication', () => {
 		expect(getAuth).toHaveBeenCalledWith(
 			expect.objectContaining({
 				hassUrl: 'https://example.ui.nabu.casa',
-				redirectUrl: 'http://localhost:3000/api/hassio_ingress/session-token/'
+				redirectUrl: 'http://localhost:3000/hearth/'
 			})
 		);
+	});
+
+	it('reuses the authenticated Home Assistant browser session in Ingress', async () => {
+		window.history.replaceState(null, '', '/api/hassio_ingress/session-token/');
+		const sharedTokens = {
+			access_token: 'existing-access-token',
+			refresh_token: 'existing-refresh-token',
+			hassUrl: 'https://example.ui.nabu.casa'
+		};
+		localStorage.setItem('hassTokens', JSON.stringify(sharedTokens));
+		const socket = {
+			close: vi.fn(),
+			addEventListener: vi.fn(),
+			subscribeMessage: vi.fn(async () => async () => {})
+		} as unknown as Connection;
+		vi.mocked(getAuth).mockImplementation(async (options) => {
+			expect(await options.loadTokens?.()).toEqual(sharedTokens);
+			expect(options.redirectUrl).toBeUndefined();
+			return { expired: false } as Auth;
+		});
+		vi.mocked(createConnection).mockResolvedValue(socket);
+
+		await authentication({ hassUrl: 'https://example.ui.nabu.casa' });
+
+		expect(getAuth).toHaveBeenCalledOnce();
+		expect(localStorage.getItem('hearthTokens')).toBeNull();
+	});
+
+	it('does not start an invalid OAuth redirect when the Ingress session is unavailable', async () => {
+		window.history.replaceState(null, '', '/api/hassio_ingress/session-token/');
+
+		await expect(authentication({ hassUrl: 'https://example.ui.nabu.casa' })).rejects.toThrow(
+			'The Home Assistant browser session is unavailable to Ingress'
+		);
+
+		expect(getAuth).not.toHaveBeenCalled();
+	});
+
+	it('does not clear the Home Assistant-owned session after an Ingress auth error', async () => {
+		window.history.replaceState(null, '', '/api/hassio_ingress/session-token/');
+		const sharedTokens = {
+			access_token: 'existing-access-token',
+			refresh_token: 'existing-refresh-token',
+			hassUrl: 'https://example.ui.nabu.casa'
+		};
+		localStorage.setItem('hassTokens', JSON.stringify(sharedTokens));
+		vi.mocked(getAuth).mockRejectedValue(ERR_INVALID_AUTH);
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+
+		await expect(authentication({ hassUrl: 'https://example.ui.nabu.casa' })).rejects.toBe(
+			ERR_INVALID_AUTH
+		);
+
+		expect(JSON.parse(localStorage.getItem('hassTokens') ?? 'null')).toEqual(sharedTokens);
 	});
 });
