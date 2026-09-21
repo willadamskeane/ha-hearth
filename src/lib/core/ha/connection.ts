@@ -127,7 +127,10 @@ export async function authentication(
 		} else {
 			auth = await getAuth({
 				...tokenStorage,
-				hassUrl: configuration.hassUrl
+				hassUrl: configuration.hassUrl,
+				// Always return to the Hearth page that initiated OAuth. This preserves
+				// per-installation Ingress paths and strips stale query parameters.
+				redirectUrl: `${window.location.origin}${window.location.pathname}`
 			});
 			if (auth.expired) await auth.refreshAccessToken();
 		}

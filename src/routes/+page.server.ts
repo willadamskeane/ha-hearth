@@ -28,7 +28,7 @@ async function loadJson(file: string) {
 	}
 }
 
-export async function load(): Promise<{
+export async function load({ request }: { request: Request }): Promise<{
 	configuration: Configuration;
 	hearth: unknown;
 	hearthError: string | null;
@@ -83,7 +83,12 @@ export async function load(): Promise<{
 			);
 	const hearthNeedsSetup = !hearthError && (hearth === undefined || hearthKeys.length === 0);
 
-	configuration.hassUrl = process.env.HASS_URL || undefined;
+	// Production requests receive this private header from server.js. Keep the
+	// environment fallback for the Vite development server, but never expose the
+	// Supervisor-only hostname when the application is running as an add-on.
+	configuration.hassUrl =
+		request.headers.get('x-hearth-hass-url') ||
+		(process.env.ADDON === 'true' ? undefined : process.env.HASS_URL || undefined);
 
 	// Load the selected language with English fallback.
 	const dir = dev ? './static' : './build/client';

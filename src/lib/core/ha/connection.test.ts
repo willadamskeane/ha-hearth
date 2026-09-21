@@ -1,6 +1,6 @@
 import { get } from 'svelte/store';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createConnection, type Connection } from 'home-assistant-js-websocket';
+import { createConnection, getAuth, type Auth, type Connection } from 'home-assistant-js-websocket';
 import {
 	authentication,
 	connected,
@@ -13,6 +13,7 @@ import {
 vi.mock('home-assistant-js-websocket', async (importOriginal) => ({
 	...(await importOriginal<typeof import('home-assistant-js-websocket')>()),
 	createConnection: vi.fn(),
+	getAuth: vi.fn(),
 	subscribeEntities: vi.fn(),
 	subscribeConfig: vi.fn(),
 	subscribeServices: vi.fn()
@@ -50,5 +51,25 @@ describe('authentication', () => {
 		expect(close).toHaveBeenCalledOnce();
 		expect(get(connection)).toBeUndefined();
 		expect(get(connected)).toBe(false);
+	});
+
+	it('returns OAuth to the current Hearth path', async () => {
+		window.history.replaceState(null, '', '/api/hassio_ingress/session-token/');
+		const socket = {
+			close: vi.fn(),
+			addEventListener: vi.fn(),
+			subscribeMessage: vi.fn(async () => async () => {})
+		} as unknown as Connection;
+		vi.mocked(getAuth).mockResolvedValue({ expired: false } as Auth);
+		vi.mocked(createConnection).mockResolvedValue(socket);
+
+		await authentication({ hassUrl: 'https://example.ui.nabu.casa' });
+
+		expect(getAuth).toHaveBeenCalledWith(
+			expect.objectContaining({
+				hassUrl: 'https://example.ui.nabu.casa',
+				redirectUrl: 'http://localhost:3000/api/hassio_ingress/session-token/'
+			})
+		);
 	});
 });

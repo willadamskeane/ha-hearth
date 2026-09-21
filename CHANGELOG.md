@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.1
+
+- Keep the Supervisor-only Home Assistant hostname on the server side and derive the browser-facing URL from trusted Ingress headers.
+- Return OAuth callbacks to the exact Hearth page that initiated authentication, including Home Assistant Ingress paths.
+- Support direct-port add-on access without exposing the internal Supervisor hostname to the browser.
+
 ## 0.1.0
 
 - Add frosted glass surfaces: a backdrop blur knob for every card, tile and widget, a scrim over the background image and an inherited text shadow.
