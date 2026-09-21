@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { motion } from '$lib/core/app/motion';
-	import { states } from '$lib/core/ha/entities';
+	import { entityState } from '$lib/core/ha/entities';
 	import {
 		isNightState,
 		STRUCTURE_CSS,
@@ -12,16 +12,14 @@
 
 	/** A display-only preset from ?theme=, replacing the stored theme without touching the config. */
 	let { presetOverride = undefined }: { presetOverride?: { theme: HearthTheme | null } } = $props();
+	let selectedDayNight = $derived(entityState($hearthConfig.day_night?.entity));
 
 	// While editing, preview the selected slot. At runtime the configured HA
 	// entity decides whether the full day or night theme is active.
 	let night = $derived(
 		$hearthEditMode && $editor?.kind === 'theme'
 			? $editedThemeSlot === 'night'
-			: isNightState(
-					$states?.[$hearthConfig.day_night?.entity ?? '']?.state,
-					$hearthConfig.day_night
-				)
+			: isNightState($selectedDayNight?.state, $hearthConfig.day_night)
 	);
 
 	let storedTheme = $derived(

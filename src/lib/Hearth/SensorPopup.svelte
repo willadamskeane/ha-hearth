@@ -2,13 +2,14 @@
 	import EmptyState from './EmptyState.svelte';
 	import { lang } from '$lib/core/i18n';
 	import { connected } from '$lib/core/ha/connection';
-	import { states } from '$lib/core/ha/entities';
+	import { entityState } from '$lib/core/ha/entities';
 	import { cachedData, fetchStatisticSeries, startDataRefresh } from '$lib/core/ha/history';
 	import { sensorNumber } from '$lib/core/ha/entities';
 
 	let { entity }: { entity: string } = $props();
 
-	let stateObj = $derived($states?.[entity]);
+	let selectedEntity = $derived(entityState(entity));
+	let stateObj = $derived($selectedEntity);
 	let value = $derived(sensorNumber(stateObj?.state));
 	let unit = $derived(stateObj?.attributes?.unit_of_measurement ?? '');
 

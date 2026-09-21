@@ -1,12 +1,13 @@
 <script lang="ts">
 	import { lang } from '$lib/core/i18n';
-	import { states, entityActive } from '$lib/core/ha/entities';
+	import { entityState, entityActive } from '$lib/core/ha/entities';
 	import { callEntityService } from '$lib/core/ha/commands';
 	import { toggleEntity } from '$lib/core/domains/entity';
 
 	let { entity }: { entity: string } = $props();
 
-	let on = $derived(entityActive(entity, $states?.[entity]));
+	let selectedEntity = $derived(entityState(entity));
+	let on = $derived(entityActive(entity, $selectedEntity));
 	let domain = $derived(entity.split('.')[0]);
 
 	function set(state: boolean) {

@@ -1,5 +1,5 @@
 import { get } from 'svelte/store';
-import type { HassEntities } from 'home-assistant-js-websocket';
+import type { HassEntities, HassEntity } from 'home-assistant-js-websocket';
 import { states } from '../ha/entities';
 import { clamp, markPending, service, setControlOverride, throttled } from '../ha/commands';
 
@@ -45,9 +45,18 @@ export function mediaVolumeFor(
 	$states: HassEntities | undefined,
 	$overrides: Record<string, number>
 ): number {
+	return mediaVolumeForEntity(entityId, $states?.[entityId], $overrides);
+}
+
+/** Entity-selective form for runtime surfaces that must not observe the full state map. */
+export function mediaVolumeForEntity(
+	entityId: string,
+	entity: HassEntity | undefined,
+	$overrides: Record<string, number>
+): number {
 	const override = $overrides[`media:${entityId}`];
 	if (override !== undefined) return override;
-	const level = $states?.[entityId]?.attributes?.volume_level;
+	const level = entity?.attributes?.volume_level;
 	return typeof level === 'number' ? Math.round(level * 100) : 0;
 }
 

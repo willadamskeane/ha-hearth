@@ -1,14 +1,13 @@
 <script lang="ts">
 	import { lang } from '$lib/core/i18n';
 	import { activateOnKeyboard } from './interaction';
-	import { states } from '$lib/core/ha/entities';
+	import { entityState } from '$lib/core/ha/entities';
 	import type { SliderUpdateMode } from '$lib/core/app/configuration';
 	import { getSupport } from '$lib/core/ha/entities';
 	import Ripple from '$lib/ui/actions/ripple';
 	import { PRESS_RIPPLE } from './config';
 	import {
-		blindPositionFor,
-		blindTiltFor,
+		blindPositionForEntity,
 		setBlindPosition,
 		setBlindTiltPosition
 	} from '$lib/core/domains/cover';
@@ -20,7 +19,9 @@
 		sliderUpdates = 'continuous'
 	}: { entity: string; sliderUpdates?: SliderUpdateMode } = $props();
 
-	let attributes = $derived($states?.[entity]?.attributes);
+	let selectedEntity = $derived(entityState(entity));
+	let stateObj = $derived($selectedEntity);
+	let attributes = $derived(stateObj?.attributes);
 
 	let supports = $derived(
 		getSupport(attributes?.supported_features, {
@@ -32,7 +33,16 @@
 		})
 	);
 
-	let tiltPosition = $derived(blindTiltFor(entity, $states, $controlOverrides));
+	let tiltPosition = $derived(
+		Math.max(
+			0,
+			Math.min(
+				100,
+				$controlOverrides[`tilt:${entity}`] ??
+					Math.round(stateObj?.attributes?.current_tilt_position ?? 0)
+			)
+		)
+	);
 
 	function callCoverService(service: string, data: Record<string, unknown> = {}) {
 		callEntityService('cover', service, entity, data);
@@ -42,7 +52,7 @@
 <PopupSlider
 	label={$lang('hearth_position')}
 	icon="blinds"
-	value={blindPositionFor(entity, $states, $controlOverrides)}
+	value={blindPositionForEntity(entity, stateObj, $controlOverrides)}
 	variant="blue"
 	updateMode={sliderUpdates}
 	onchange={(value, commit) => setBlindPosition(entity, value, commit)}

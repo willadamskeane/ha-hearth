@@ -78,7 +78,7 @@
 		font: inherit;
 		font-size: var(--h-type-secondary);
 		cursor: pointer;
-		backdrop-filter: blur(6px);
+		backdrop-filter: var(--h-overlay-blur, blur(6px));
 	}
 
 	.shortcut img,

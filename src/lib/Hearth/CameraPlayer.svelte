@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { connection } from '$lib/core/ha/connection';
-	import { states } from '$lib/core/ha/entities';
+	import { entityState } from '$lib/core/ha/entities';
 	import { lang } from '$lib/core/i18n';
 	import { hearthEditMode } from './store';
 
@@ -15,9 +15,10 @@
 	let failed = $state(false);
 	let attempt = $state(0);
 	let refreshed = $state(0);
-	const picture = $derived($states?.[entity]?.attributes?.entity_picture as string | undefined);
+	let selectedEntity = $derived(entityState(entity));
+	const picture = $derived($selectedEntity?.attributes?.entity_picture as string | undefined);
 	const streamType = $derived(
-		$states?.[entity]?.attributes?.frontend_stream_type as string | undefined
+		$selectedEntity?.attributes?.frontend_stream_type as string | undefined
 	);
 	const poster = $derived(
 		picture ? `${picture}${picture.includes('?') ? '&' : '?'}t=${refreshed}` : undefined

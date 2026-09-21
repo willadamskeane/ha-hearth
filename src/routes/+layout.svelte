@@ -22,4 +22,14 @@
 	:global(*, *::before, *::after) {
 		box-sizing: inherit;
 	}
+
+	:global(html.low-power) {
+		--h-surface-blur: none !important;
+		--h-overlay-blur: none !important;
+		--h-card-shadow: none !important;
+		--h-text-shadow: none !important;
+		--h-motion-fast: 70ms !important;
+		--h-motion-base: 90ms !important;
+		--h-motion-slow: 120ms !important;
+	}
 </style>

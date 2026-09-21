@@ -3,7 +3,7 @@
 	import Ripple from '$lib/ui/actions/ripple';
 	import { lang } from '$lib/core/i18n';
 	import { timer } from '$lib/core/app/clock';
-	import { entityAvailable, states } from '$lib/core/ha/entities';
+	import { entityAvailable, entityState } from '$lib/core/ha/entities';
 	import { calendarDaysBetween, parseLocalDate } from '$lib/core/i18n/time';
 	import { callEntityService } from '$lib/core/ha/commands';
 	import { PRESS_RIPPLE } from '../../config';
@@ -15,7 +15,8 @@
 	let { card }: { card: DaysSinceCard } = $props();
 
 	let entity = $derived(card.entity ?? '');
-	let stateObj = $derived($states?.[entity]);
+	let selectedEntity = $derived(entityState(entity));
+	let stateObj = $derived($selectedEntity);
 	let label = $derived(card.title || stateObj?.attributes?.friendly_name || entity);
 	let available = $derived(entityAvailable(stateObj));
 	let days = $derived.by(() => {

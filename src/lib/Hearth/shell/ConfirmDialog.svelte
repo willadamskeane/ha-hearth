@@ -71,7 +71,7 @@
 		place-items: center;
 		padding: 20px;
 		background: var(--h-scrim);
-		backdrop-filter: blur(8px);
+		backdrop-filter: var(--h-overlay-blur, blur(8px));
 	}
 
 	.confirm-dialog {

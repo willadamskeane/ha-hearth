@@ -1,12 +1,13 @@
 <script lang="ts">
 	import { lang } from '$lib/core/i18n';
-	import { states } from '$lib/core/ha/entities';
+	import { entityState } from '$lib/core/ha/entities';
 	import { callEntityService } from '$lib/core/ha/commands';
 	import { setClimateHvacMode, setClimateTemperature } from '$lib/core/domains/climate';
 
 	let { entity }: { entity: string } = $props();
 
-	let stateObj = $derived($states?.[entity]);
+	let selectedEntity = $derived(entityState(entity));
+	let stateObj = $derived($selectedEntity);
 	let attributes = $derived(stateObj?.attributes ?? {});
 	let step = $derived<number>(attributes.target_temp_step ?? 0.5);
 	let min = $derived<number>(attributes.min_temp ?? 7);

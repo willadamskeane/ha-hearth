@@ -1,12 +1,13 @@
 <script lang="ts">
 	import { lang } from '$lib/core/i18n';
-	import { states } from '$lib/core/ha/entities';
+	import { entityState } from '$lib/core/ha/entities';
 	import { callEntityService } from '$lib/core/ha/commands';
 	import { timer } from '$lib/core/app/clock';
 
 	let { entity }: { entity: string } = $props();
 
-	let stateObj = $derived($states?.[entity]);
+	let selectedEntity = $derived(entityState(entity));
+	let stateObj = $derived($selectedEntity);
 	let timerState = $derived(stateObj?.state);
 	// svelte-ignore state_referenced_locally
 	let duration = $state<string>(stateObj?.attributes?.duration ?? '0:05:00');

@@ -2,11 +2,11 @@
 	import { ICON } from './iconSizes';
 	import Ripple from '$lib/ui/actions/ripple';
 	import { lang } from '$lib/core/i18n';
-	import { states } from '$lib/core/ha/entities';
+	import { entityState } from '$lib/core/ha/entities';
 	import type { SliderUpdateMode } from '$lib/core/app/configuration';
 	import { capitalize, PRESS_RIPPLE } from './config';
 	import { hearthEditMode, popup, requestConfirmation } from './store';
-	import { blindPositionFor, toggleBlind } from '$lib/core/domains/cover';
+	import { blindPositionForEntity, toggleBlind } from '$lib/core/domains/cover';
 	import { controlOverrides, pendingEntities } from '$lib/core/ha/commands';
 	import { entityAvailability } from '$lib/core/ha/entities';
 	import Icon from './Icon.svelte';
@@ -35,11 +35,13 @@
 		onedit?: () => void;
 	} = $props();
 
-	let position = $derived(blindPositionFor(entity, $states, $controlOverrides));
-	let availability = $derived(entityAvailability($states?.[entity]));
+	let selectedEntity = $derived(entityState(entity));
+	let stateObj = $derived($selectedEntity);
+	let position = $derived(blindPositionForEntity(entity, stateObj, $controlOverrides));
+	let availability = $derived(entityAvailability(stateObj));
 	let available = $derived(availability === 'available');
 	let open = $derived(position > 0);
-	let label = $derived(name || $states?.[entity]?.attributes?.friendly_name || entity);
+	let label = $derived(name || stateObj?.attributes?.friendly_name || entity);
 	let stateText = $derived(
 		!available
 			? availability === 'missing'
@@ -54,7 +56,7 @@
 	let interactive = $derived($hearthEditMode || (!readonly && available));
 	let disruptive = $derived(
 		['door', 'garage', 'garage_door', 'gate'].includes(
-			String($states?.[entity]?.attributes?.device_class ?? '')
+			String(stateObj?.attributes?.device_class ?? '')
 		)
 	);
 

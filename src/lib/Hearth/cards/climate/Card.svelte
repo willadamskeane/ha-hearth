@@ -4,7 +4,7 @@
 	import { activateOnKeyboard } from '../../interaction';
 	import Ripple from '$lib/ui/actions/ripple';
 	import { config } from '$lib/core/ha/connection';
-	import { states } from '$lib/core/ha/entities';
+	import { entityState } from '$lib/core/ha/entities';
 	import { PRESS_RIPPLE } from '../../config';
 	import type { OverviewCard } from '../../config';
 	import { hearthEditMode } from '../../store';
@@ -26,7 +26,8 @@
 		fan_only: 'mode_fan'
 	};
 
-	let entity = $derived(card.entity ? $states?.[card.entity] : undefined);
+	let selectedEntity = $derived(entityState(card.entity));
+	let entity = $derived($selectedEntity);
 	let attributes = $derived(entity?.attributes ?? {});
 	let pending = $derived(card.entity !== undefined && $pendingEntities[card.entity] !== undefined);
 	let unit = $derived($config?.unit_system?.temperature ?? '°');

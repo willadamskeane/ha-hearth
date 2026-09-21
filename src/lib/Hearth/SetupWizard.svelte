@@ -198,7 +198,7 @@
 		inset: 0;
 		z-index: var(--h-layer-confirm);
 		background: var(--h-overlay);
-		backdrop-filter: blur(8px);
+		backdrop-filter: var(--h-overlay-blur, blur(8px));
 		display: flex;
 		align-items: center;
 		justify-content: center;

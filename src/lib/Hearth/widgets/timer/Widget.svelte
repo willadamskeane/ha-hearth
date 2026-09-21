@@ -2,7 +2,7 @@
 	import { ICON } from '../../iconSizes';
 	import { lang } from '$lib/core/i18n';
 	import { timer } from '$lib/core/app/clock';
-	import { states } from '$lib/core/ha/entities';
+	import { entityState } from '$lib/core/ha/entities';
 	import { callEntityService } from '$lib/core/ha/commands';
 	import { hearthEditMode } from '../../store';
 	import Icon from '../../Icon.svelte';
@@ -11,7 +11,8 @@
 	let { widget }: { widget: TimerWidget } = $props();
 
 	let entity = $derived(widget.entity ?? '');
-	let stateObj = $derived($states?.[entity]);
+	let selectedEntity = $derived(entityState(entity));
+	let stateObj = $derived($selectedEntity);
 	let timerState = $derived(stateObj?.state);
 	let label = $derived(widget.name || stateObj?.attributes?.friendly_name || entity);
 

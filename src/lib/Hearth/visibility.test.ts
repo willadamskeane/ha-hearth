@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { evaluateVisibility } from './visibility';
+import { evaluateVisibility, visibilityEntityIds } from './visibility';
 
 describe('evaluateVisibility', () => {
 	const states = {
@@ -53,5 +53,15 @@ describe('evaluateVisibility', () => {
 		expect(evaluateVisibility([{ or: [{ entity: 'switch.a', state: 'on' }] }], states, {})).toBe(
 			false
 		);
+	});
+
+	it('collects the entity dependencies of nested condition trees', () => {
+		expect(
+			visibilityEntityIds([
+				{ entity: 'light.desk', state: 'on' },
+				{ media: '(min-width: 800px)' },
+				{ or: [{ entity: 'sensor.t', above: 20 }, { entity: 'light.desk' }] }
+			])
+		).toEqual(['light.desk', 'sensor.t']);
 	});
 });

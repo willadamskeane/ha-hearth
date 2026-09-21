@@ -2,7 +2,7 @@
 	import { ICON } from './iconSizes';
 	import Ripple from '$lib/ui/actions/ripple';
 	import { lang } from '$lib/core/i18n';
-	import { states } from '$lib/core/ha/entities';
+	import { entityState } from '$lib/core/ha/entities';
 	import type { SliderUpdateMode } from '$lib/core/app/configuration';
 	import { capitalize, PRESS_RIPPLE } from './config';
 	import { horizontalDrag } from './drag';
@@ -10,7 +10,7 @@
 	import Icon from './Icon.svelte';
 	import { hearthEditMode, popup } from './store';
 	import { controlOverrides, pendingEntities } from '$lib/core/ha/commands';
-	import { lightViewFor, setLightLevel, toggleLight } from '$lib/core/domains/light';
+	import { lightViewForEntity, setLightLevel, toggleLight } from '$lib/core/domains/light';
 	import TuneButton from './TuneButton.svelte';
 
 	let {
@@ -35,14 +35,16 @@
 		onedit?: () => void;
 	} = $props();
 
-	let view = $derived(lightViewFor(entity, $states, $controlOverrides));
+	let selectedEntity = $derived(entityState(entity));
+	let stateObj = $derived($selectedEntity);
+	let view = $derived(lightViewForEntity(entity, stateObj, $controlOverrides));
 	let available = $derived(view.availability === 'available');
 	let availabilityText = $derived(
 		view.availability === 'missing'
 			? $lang('hearth_missing_entity')
 			: capitalize($lang(view.availability))
 	);
-	let label = $derived(name || $states?.[entity]?.attributes?.friendly_name || entity);
+	let label = $derived(name || stateObj?.attributes?.friendly_name || entity);
 	let iconColor = $derived(
 		!available
 			? 'var(--h-icon-dim)'

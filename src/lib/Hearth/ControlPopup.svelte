@@ -1,11 +1,11 @@
 <script lang="ts">
 	import { ICON } from './iconSizes';
 	import { lang } from '$lib/core/i18n';
-	import { states } from '$lib/core/ha/entities';
+	import { entityState } from '$lib/core/ha/entities';
 	import { closePopup, popup } from './store';
 	import { pushLayer } from '$lib/ui/layers';
 	import { controlOverrides, pendingEntities } from '$lib/core/ha/commands';
-	import { lightViewFor, toggleLight } from '$lib/core/domains/light';
+	import { lightViewForEntity, toggleLight } from '$lib/core/domains/light';
 	import BlindPopup from './BlindPopup.svelte';
 	import FanPopup from './FanPopup.svelte';
 	import Icon from './Icon.svelte';
@@ -23,6 +23,8 @@
 		media: { icon: 'music_note', sub: 'hearth_media_player' },
 		sensor: { icon: 'monitoring', sub: 'hearth_last_24_hours' }
 	};
+	let selectedEntity = $derived(entityState($popup?.entity));
+	let popupEntity = $derived($selectedEntity);
 
 	// the detail sheet takes its icon and caption from the entity's domain
 	function headerFor(current: NonNullable<typeof $popup>) {
@@ -60,9 +62,9 @@
 						<button
 							type="button"
 							class="switch pressable"
-							class:on={lightViewFor(entity, $states, $controlOverrides).on}
+							class:on={lightViewForEntity(entity, popupEntity, $controlOverrides).on}
 							aria-label={$lang('hearth_toggle_light')}
-							aria-pressed={lightViewFor(entity, $states, $controlOverrides).on}
+							aria-pressed={lightViewForEntity(entity, popupEntity, $controlOverrides).on}
 							class:pending={$pendingEntities[entity] !== undefined}
 							onclick={() => toggleLight(entity)}
 						>
@@ -101,7 +103,7 @@
 		inset: 0;
 		z-index: var(--h-layer-popup);
 		background: var(--h-overlay);
-		backdrop-filter: blur(8px);
+		backdrop-filter: var(--h-overlay-blur, blur(8px));
 		display: flex;
 		align-items: center;
 		justify-content: center;

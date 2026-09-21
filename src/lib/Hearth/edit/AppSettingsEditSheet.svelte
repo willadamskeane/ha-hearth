@@ -3,7 +3,7 @@
 	import { onMount } from 'svelte';
 	import { base } from '$app/paths';
 	import Ripple from '$lib/ui/actions/ripple';
-	import { configuration } from '$lib/core/app/configuration';
+	import { configuration, type PerformanceMode } from '$lib/core/app/configuration';
 	import {
 		hapticCapabilities,
 		haptics,
@@ -12,6 +12,7 @@
 		vibrate
 	} from '$lib/core/app/haptics';
 	import { motion } from '$lib/core/app/motion';
+	import { applyPerformanceMode, resolveLowPower } from '$lib/core/app/performance';
 	import { lang, selectedLanguage, translation } from '$lib/core/i18n';
 	import { PRESS_RIPPLE } from '../config';
 	import { editor } from '../store';
@@ -21,6 +22,7 @@
 	let languages = $state<{ value: string; label: string }[]>([]);
 	let locale = $state($selectedLanguage || 'en');
 	let reduceMotion = $state($motion === 0);
+	let performanceMode = $state<PerformanceMode>($configuration?.performance_mode ?? 'auto');
 	let touchFeedback = $state($haptics);
 	let feedbackSupported = $state(true);
 	let feedbackNeedsHttps = $state(false);
@@ -70,6 +72,8 @@
 		};
 		if (reduceMotion) next.motion = false;
 		else delete next.motion;
+		if (performanceMode === 'auto') delete next.performance_mode;
+		else next.performance_mode = performanceMode;
 		if (touchFeedback) next.haptics = true;
 		else delete next.haptics;
 		if (token.trim()) next.token = token.trim();
@@ -80,6 +84,8 @@
 		try {
 			const json: Record<string, unknown> = { ...next };
 			delete json.hassUrl;
+			delete json.serverAuth;
+			delete json.serverLowPower;
 			const response = await fetch(`${base}/_api/save_config`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
@@ -93,7 +99,9 @@
 
 			$configuration = { ...next, revision: (await response.json()).revision };
 			$selectedLanguage = locale;
-			$motion = reduceMotion ? 0 : 190;
+			const isLowPower = resolveLowPower(next, navigator);
+			applyPerformanceMode(isLowPower);
+			$motion = reduceMotion || isLowPower ? 0 : 190;
 			$haptics = touchFeedback;
 			vibrate('success');
 			document.documentElement.lang = locale || 'en';
@@ -149,6 +157,20 @@
 					</span>
 				</div>
 			{/if}
+			<div class="row">
+				<div class="row-main">
+					<div class="row-label">{$lang('hearth_performance_mode')}</div>
+					<div class="row-sub">{$lang('hearth_performance_mode_hint')}</div>
+				</div>
+				<span class="select-wrap">
+					<select bind:value={performanceMode} aria-label={$lang('hearth_performance_mode')}>
+						<option value="auto">{$lang('hearth_performance_auto')}</option>
+						<option value="low">{$lang('hearth_performance_low')}</option>
+						<option value="full">{$lang('hearth_performance_full')}</option>
+					</select>
+					<Icon name="expand_more" size={ICON.control} />
+				</span>
+			</div>
 			<div class="row">
 				<div class="row-main"><div class="row-label">{$lang('hearth_reduce_motion')}</div></div>
 				<button

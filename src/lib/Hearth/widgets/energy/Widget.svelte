@@ -2,7 +2,7 @@
 	import { ICON } from '../../iconSizes';
 	import { lang } from '$lib/core/i18n';
 	import { connected } from '$lib/core/ha/connection';
-	import { states } from '$lib/core/ha/entities';
+	import { entityState } from '$lib/core/ha/entities';
 	import type { RailWidget } from '../../config';
 	import { fetchStatistics, startDataRefresh } from '$lib/core/ha/history';
 	import { sensorNumber } from '$lib/core/ha/entities';
@@ -45,10 +45,11 @@
 	});
 
 	let total = $derived(hours ? hours.reduce((sum, value) => sum + value, 0) : null);
+	let selectedPrice = $derived(entityState(widget.price_entity));
 
 	let pricePerKwh = $derived(
 		widget.price_entity
-			? sensorNumber($states?.[widget.price_entity]?.state)
+			? sensorNumber($selectedPrice?.state)
 			: typeof widget.price === 'number'
 				? widget.price
 				: null

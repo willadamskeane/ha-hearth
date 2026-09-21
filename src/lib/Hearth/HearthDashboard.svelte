@@ -183,6 +183,10 @@
 		animation: hearth-pending 1.1s ease-in-out infinite;
 	}
 
+	:global(html.low-power) .frame :global(.pending) {
+		animation-name: hearth-pending-low-power;
+	}
+
 	/* Theme changes animate only the composited dashboard backdrop. Descendant
 	   tokens switch atomically instead of forcing a four-property repaint of
 	   every node in the tree. */
@@ -225,6 +229,12 @@
 			filter var(--h-motion-fast) ease;
 	}
 
+	:global(html.low-power) .frame :global(.pressable:active) {
+		transform: scale(0.985);
+		filter: none;
+		transition: transform var(--h-motion-fast) ease;
+	}
+
 	@keyframes -global-hearth-pending {
 		0%,
 		100% {
@@ -234,6 +244,16 @@
 		50% {
 			filter: drop-shadow(0 0 10px rgb(var(--h-accent-rgb) / calc(0.55 * var(--h-accent-scale))));
 			opacity: 0.88;
+		}
+	}
+
+	@keyframes -global-hearth-pending-low-power {
+		0%,
+		100% {
+			opacity: 1;
+		}
+		50% {
+			opacity: 0.72;
 		}
 	}
 

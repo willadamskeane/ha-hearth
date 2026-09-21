@@ -1,11 +1,12 @@
 <script lang="ts">
 	import { lang, selectedLanguage, fill } from '$lib/core/i18n';
-	import { states } from '$lib/core/ha/entities';
+	import { entityState as selectEntityState } from '$lib/core/ha/entities';
 	import { isTimestamp, relativeTime } from '$lib/core/i18n/time';
 	import { getDomain } from '$lib/core/ha/entities';
 
 	let { entity_id }: { entity_id: string | undefined } = $props();
-	let entity = $derived(entity_id ? $states?.[entity_id] : undefined);
+	let selectedEntity = $derived(selectEntityState(entity_id));
+	let entity = $derived($selectedEntity);
 
 	let attributes = $derived(entity?.attributes);
 	let entityState = $derived(entity?.state);

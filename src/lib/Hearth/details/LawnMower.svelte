@@ -1,11 +1,12 @@
 <script lang="ts">
 	import { lang } from '$lib/core/i18n';
-	import { states } from '$lib/core/ha/entities';
+	import { entityState } from '$lib/core/ha/entities';
 	import { callEntityService } from '$lib/core/ha/commands';
 
 	let { entity }: { entity: string } = $props();
 
-	let stateObj = $derived($states?.[entity]);
+	let selectedEntity = $derived(entityState(entity));
+	let stateObj = $derived($selectedEntity);
 	// LawnMowerEntityFeature: 1 start mowing, 2 pause, 4 dock
 	let features = $derived<number>(stateObj?.attributes?.supported_features ?? 0);
 </script>

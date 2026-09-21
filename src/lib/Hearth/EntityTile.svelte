@@ -3,7 +3,7 @@
 	import Ripple from '$lib/ui/actions/ripple';
 	import StateLogic from '$lib/ui/StateLogic.svelte';
 	import { lang, fill } from '$lib/core/i18n';
-	import { states } from '$lib/core/ha/entities';
+	import { entityState } from '$lib/core/ha/entities';
 	import type { SliderUpdateMode } from '$lib/core/app/configuration';
 	import { PRESS_RIPPLE } from './config';
 	import { domainDescriptor, domainIcon, entityIsReadout } from '$lib/core/domains';
@@ -42,7 +42,8 @@
 	} = $props();
 
 	let domain = $derived(entity.split('.')[0]);
-	let stateObj = $derived($states?.[entity]);
+	let selectedEntity = $derived(entityState(entity));
+	let stateObj = $derived($selectedEntity);
 	let availability = $derived(entityAvailability(stateObj));
 	let available = $derived(availability === 'available');
 	let on = $derived(entityActiveFor(entity, stateObj, $controlOverrides));

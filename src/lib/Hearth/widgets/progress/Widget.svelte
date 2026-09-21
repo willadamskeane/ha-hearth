@@ -2,7 +2,7 @@
 	import { lang } from '$lib/core/i18n';
 	import { ICON } from '../../iconSizes';
 	import { browser } from '$app/environment';
-	import { states } from '$lib/core/ha/entities';
+	import { entityState } from '$lib/core/ha/entities';
 	import { timer } from '$lib/core/app/clock';
 	import { capitalize, type RailWidget } from '../../config';
 	import { hearthEditMode } from '../../store';
@@ -15,7 +15,10 @@
 	const IDLE_STATES = ['idle', 'off', 'unavailable', 'unknown', 'standby', 'none', 'docked'];
 	const DEFAULT_COMPLETED_STATES = ['complete', 'completed', 'finished', 'done'];
 
-	let statusEntity = $derived(widget.status_entity ? $states?.[widget.status_entity] : undefined);
+	let selectedStatus = $derived(entityState(widget.status_entity));
+	let selectedProgress = $derived(entityState(widget.progress_entity));
+	let selectedRemaining = $derived(entityState(widget.remaining_entity));
+	let statusEntity = $derived($selectedStatus);
 	let status = $derived(statusEntity?.state);
 	let normalizedStatus = $derived(status?.toLowerCase());
 	let completed = $derived(
@@ -34,9 +37,7 @@
 	);
 
 	let progress = $derived.by(() => {
-		const value = widget.progress_entity
-			? sensorNumber($states?.[widget.progress_entity]?.state)
-			: null;
+		const value = widget.progress_entity ? sensorNumber($selectedProgress?.state) : null;
 		return value === null ? null : Math.max(0, Math.min(100, value));
 	});
 
@@ -105,7 +106,7 @@
 
 	// the remaining entity may hold plain minutes or a finish timestamp
 	let remaining = $derived.by(() => {
-		const raw = widget.remaining_entity ? $states?.[widget.remaining_entity]?.state : undefined;
+		const raw = widget.remaining_entity ? $selectedRemaining?.state : undefined;
 		if (raw === undefined || raw === 'unavailable' || raw === 'unknown') return null;
 		const minutes = sensorNumber(raw);
 		if (minutes !== null) return `${Math.max(0, Math.round(minutes))} min`;

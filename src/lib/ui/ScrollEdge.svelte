@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { lowPower } from '$lib/core/app/performance';
 	/*
 	 * Progressive blur for the edge of a scroll container. CSS has no variable
 	 * blur radius, so the band is five full-size layers whose backdrop blur
@@ -35,11 +36,15 @@
 	style:--edge-toward={toward}
 	aria-hidden="true"
 >
-	<div></div>
-	<div></div>
-	<div></div>
-	<div></div>
-	<div></div>
+	{#if $lowPower}
+		<div class="fade"></div>
+	{:else}
+		<div></div>
+		<div></div>
+		<div></div>
+		<div></div>
+		<div></div>
+	{/if}
 </div>
 
 <style>
@@ -93,6 +98,15 @@
 	.edge > div {
 		position: absolute;
 		inset: 0;
+	}
+
+	/* One ordinary paint replaces five backdrop-filter passes on kiosk GPUs. */
+	.edge > .fade {
+		background: linear-gradient(
+			var(--edge-toward),
+			transparent 0%,
+			rgb(var(--h-surface-rgb) / 0.72) 100%
+		);
 	}
 
 	.edge > div:nth-child(1) {

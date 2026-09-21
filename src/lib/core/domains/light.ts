@@ -1,5 +1,5 @@
 import { get } from 'svelte/store';
-import type { HassEntities } from 'home-assistant-js-websocket';
+import type { HassEntities, HassEntity } from 'home-assistant-js-websocket';
 import {
 	entityAvailability,
 	entityAvailable,
@@ -24,7 +24,15 @@ export function lightViewFor(
 	$states: HassEntities | undefined,
 	$overrides: Record<string, number>
 ): LightView {
-	const entity = $states?.[entityId];
+	return lightViewForEntity(entityId, $states?.[entityId], $overrides);
+}
+
+/** Entity-selective form for runtime surfaces that must not observe the full state map. */
+export function lightViewForEntity(
+	entityId: string,
+	entity: HassEntity | undefined,
+	$overrides: Record<string, number>
+): LightView {
 	const availability = entityAvailability(entity);
 	const attributes = entity?.attributes ?? {};
 	const overrideLevel = availability === 'available' ? $overrides[`level:${entityId}`] : undefined;

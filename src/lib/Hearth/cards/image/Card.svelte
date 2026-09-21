@@ -1,11 +1,12 @@
 <script lang="ts">
 	import { lang } from '$lib/core/i18n';
-	import { states } from '$lib/core/ha/entities';
+	import { entityState } from '$lib/core/ha/entities';
 	import type { OverviewCard } from '../../config';
 
 	let { card }: { card: Extract<OverviewCard, { type: 'image' }> } = $props();
 
-	let entity = $derived(card.entity ? $states?.[card.entity] : undefined);
+	let selectedEntity = $derived(entityState(card.entity));
+	let entity = $derived($selectedEntity);
 	let entityPicture = $derived(entity?.attributes?.entity_picture as string | undefined);
 	let imageSource = $derived.by(() => {
 		if (!entityPicture) return undefined;

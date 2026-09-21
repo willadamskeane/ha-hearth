@@ -2,6 +2,17 @@ import { sensorNumber } from '$lib/core/ha/entities';
 import type { HassEntities } from 'home-assistant-js-websocket';
 import type { VisibilityCondition } from './config';
 
+/** Entity ids referenced by a condition tree, for selective subscriptions. */
+export function visibilityEntityIds(conditions: VisibilityCondition[] | undefined): string[] {
+	const ids = new Set<string>();
+	const visit = (condition: VisibilityCondition) => {
+		if ('entity' in condition) ids.add(condition.entity);
+		else if ('or' in condition) condition.or.forEach(visit);
+	};
+	conditions?.forEach(visit);
+	return [...ids];
+}
+
 /**
  * Evaluates a list of visibility conditions (ANDed together) against current
  * entity states and already-resolved media query matches.

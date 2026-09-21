@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { ICON } from '../../iconSizes';
 	import { lang } from '$lib/core/i18n';
-	import { states } from '$lib/core/ha/entities';
+	import { entityState } from '$lib/core/ha/entities';
 	import { timer } from '$lib/core/app/clock';
 	import { horizontalDrag } from '../../drag';
 	import type { OverviewCard } from '../../config';
@@ -19,7 +19,8 @@
 
 	let { card }: { card: Extract<OverviewCard, { type: 'media' }> } = $props();
 
-	let entity = $derived(card.entity ? $states?.[card.entity] : undefined);
+	let selectedEntity = $derived(entityState(card.entity));
+	let entity = $derived($selectedEntity);
 	let pending = $derived(card.entity !== undefined && $pendingEntities[card.entity] !== undefined);
 	let attributes = $derived(entity?.attributes ?? {});
 	let playing = $derived(entity?.state === 'playing');

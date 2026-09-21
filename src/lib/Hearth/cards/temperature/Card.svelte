@@ -2,7 +2,7 @@
 	import { ICON } from '../../iconSizes';
 	import { lang } from '$lib/core/i18n';
 	import { connected } from '$lib/core/ha/connection';
-	import { states } from '$lib/core/ha/entities';
+	import { entityState } from '$lib/core/ha/entities';
 	import type { OverviewCard } from '../../config';
 	import { cachedData, fetchStatisticSeries, startDataRefresh } from '$lib/core/ha/history';
 	import { airQualityVerdict } from '$lib/core/domains/sensor';
@@ -13,16 +13,13 @@
 
 	let { card }: { card: Extract<OverviewCard, { type: 'temperature' }> } = $props();
 
-	let value = $derived(sensorNumber(card.entity ? $states?.[card.entity]?.state : undefined));
-	let verdict = $derived(
-		airQualityVerdict(
-			card.entity ? $states?.[card.entity]?.attributes?.device_class : undefined,
-			value,
-			card.verdict
-		)
-	);
+	let selectedReading = $derived(entityState(card.entity));
+	let reading = $derived($selectedReading);
+	let value = $derived(sensorNumber(reading?.state));
+	let verdict = $derived(airQualityVerdict(reading?.attributes?.device_class, value, card.verdict));
 
-	let climate = $derived(card.climate_entity ? $states?.[card.climate_entity] : undefined);
+	let selectedClimate = $derived(entityState(card.climate_entity));
+	let climate = $derived($selectedClimate);
 	// the pending override wins, so repeated +/- presses step from the value
 	// just sent rather than resending the stale state
 	let target = $derived(

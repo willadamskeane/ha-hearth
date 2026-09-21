@@ -2,7 +2,7 @@
 	import { ICON } from './iconSizes';
 	import { lang } from '$lib/core/i18n';
 	import { activateOnKeyboard } from './interaction';
-	import { states } from '$lib/core/ha/entities';
+	import { entityState } from '$lib/core/ha/entities';
 	import { hearthEditMode } from './store';
 	import { sensorNumber } from '$lib/core/ha/entities';
 	import Icon from './Icon.svelte';
@@ -23,9 +23,12 @@
 		onedit?: () => void;
 	} = $props();
 
+	let selectedTemp = $derived(entityState(tempEntity));
+	let selectedHumidity = $derived(entityState(humidityEntity));
+
 	let climate = $derived.by(() => {
-		const temp = sensorNumber(tempEntity ? $states?.[tempEntity]?.state : undefined);
-		const humidity = sensorNumber(humidityEntity ? $states?.[humidityEntity]?.state : undefined);
+		const temp = sensorNumber($selectedTemp?.state);
+		const humidity = sensorNumber($selectedHumidity?.state);
 		return {
 			temp: temp === null ? '-' : `${temp.toFixed(1)}°`,
 			humidity: humidity === null ? '-' : `${Math.round(humidity)}%`

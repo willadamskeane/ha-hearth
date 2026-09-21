@@ -1,18 +1,19 @@
 <script lang="ts">
 	import { lang } from '$lib/core/i18n';
 	import { timer } from '$lib/core/app/clock';
-	import { states } from '$lib/core/ha/entities';
+	import { entityStates } from '$lib/core/ha/entities';
 	import MediaCard from '../media/Card.svelte';
 	import type { ConditionalMediaCard } from './descriptor';
 
 	let { card }: { card: ConditionalMediaCard } = $props();
+	let selectedPlayers = $derived(entityStates(card.media_players));
 
 	// the player that changed most recently wins while it plays; a paused one
 	// keeps the card for `timeout` seconds so a short pause does not flip it
 	let current = $derived.by(() => {
 		const timeout = (card.timeout ?? 300) * 1000;
 		const players = card.media_players
-			.map((entityId) => $states?.[entityId])
+			.map((entityId) => $selectedPlayers[entityId])
 			.filter((entity) => entity !== undefined)
 			.sort((a, b) => Date.parse(b.last_changed) - Date.parse(a.last_changed));
 		const playing = players.find((entity) => entity.state === 'playing');

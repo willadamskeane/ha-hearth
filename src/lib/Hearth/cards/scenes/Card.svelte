@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { lang, fill } from '$lib/core/i18n';
 	import Ripple from '$lib/ui/actions/ripple';
-	import { entityControllable, states } from '$lib/core/ha/entities';
+	import { entityControllable, entityStates } from '$lib/core/ha/entities';
 	import { PRESS_RIPPLE } from '../../config';
 	import type { OverviewCard } from '../../config';
 	import { hearthEditMode, requestConfirmation } from '../../store';
@@ -10,16 +10,17 @@
 	import Icon from '../../Icon.svelte';
 
 	let { card }: { card: Extract<OverviewCard, { type: 'scenes' }> } = $props();
+	let selectedScenes = $derived(entityStates(card.scenes.map((scene) => scene.entity)));
 
 	let bar = $derived(card.style === 'bar');
-	let activeIndex = $derived(activeSceneIndex(card.scenes, $states));
+	let activeIndex = $derived(activeSceneIndex(card.scenes, $selectedScenes));
 
 	function sceneName(ref: { entity: string; name?: string }) {
-		return ref.name || $states?.[ref.entity]?.attributes?.friendly_name || ref.entity;
+		return ref.name || $selectedScenes[ref.entity]?.attributes?.friendly_name || ref.entity;
 	}
 
 	function requestScene(ref: { entity: string; name?: string }) {
-		if ($hearthEditMode || !entityControllable($states?.[ref.entity])) return;
+		if ($hearthEditMode || !entityControllable($selectedScenes[ref.entity])) return;
 		const name = sceneName(ref);
 		requestConfirmation({
 			title: fill($lang('hearth_activate_scene_confirm'), { name: name }),
@@ -44,8 +45,8 @@
 					type="button"
 					class="scene pressable"
 					class:active
-					class:unavailable={!entityControllable($states?.[ref.entity])}
-					aria-disabled={!entityControllable($states?.[ref.entity])}
+					class:unavailable={!entityControllable($selectedScenes[ref.entity])}
+					aria-disabled={!entityControllable($selectedScenes[ref.entity])}
 					class:pending={$pendingEntities[ref.entity] !== undefined}
 					use:Ripple={PRESS_RIPPLE}
 					onclick={() => requestScene(ref)}

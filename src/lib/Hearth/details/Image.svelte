@@ -1,15 +1,15 @@
 <script lang="ts">
 	import { lang } from '$lib/core/i18n';
-	import { states } from '$lib/core/ha/entities';
+	import { entityState } from '$lib/core/ha/entities';
 
 	let { entity }: { entity: string } = $props();
 
-	let picture = $derived($states?.[entity]?.attributes?.entity_picture as string | undefined);
+	let selectedEntity = $derived(entityState(entity));
+	let stateObj = $derived($selectedEntity);
+	let picture = $derived(stateObj?.attributes?.entity_picture as string | undefined);
 	// the state is the last-changed timestamp; appending it busts the cache
 	let src = $derived(
-		picture
-			? `${picture}${picture.includes('?') ? '&' : '?'}t=${$states?.[entity]?.state}`
-			: undefined
+		picture ? `${picture}${picture.includes('?') ? '&' : '?'}t=${stateObj?.state}` : undefined
 	);
 </script>
 

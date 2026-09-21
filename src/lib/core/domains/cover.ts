@@ -1,5 +1,5 @@
 import { get } from 'svelte/store';
-import type { HassEntities } from 'home-assistant-js-websocket';
+import type { HassEntities, HassEntity } from 'home-assistant-js-websocket';
 import { entityAvailable, states } from '../ha/entities';
 import {
 	clamp,
@@ -17,7 +17,15 @@ export function blindPositionFor(
 	$states: HassEntities | undefined,
 	$overrides: Record<string, number>
 ): number {
-	const entity = $states?.[entityId];
+	return blindPositionForEntity(entityId, $states?.[entityId], $overrides);
+}
+
+/** Entity-selective form for runtime surfaces that must not observe the full state map. */
+export function blindPositionForEntity(
+	entityId: string,
+	entity: HassEntity | undefined,
+	$overrides: Record<string, number>
+): number {
 	const actual = entity?.attributes?.current_position ?? (entity?.state === 'open' ? 100 : 0);
 	return clamp($overrides[`blind:${entityId}`] ?? Math.round(actual), 0, 100);
 }

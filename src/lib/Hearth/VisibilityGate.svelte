@@ -1,8 +1,8 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import { states } from '$lib/core/ha/entities';
+	import { entityStates } from '$lib/core/ha/entities';
 	import type { VisibilityCondition } from './config';
-	import { evaluateVisibility } from './visibility';
+	import { evaluateVisibility, visibilityEntityIds } from './visibility';
 
 	let {
 		conditions,
@@ -10,6 +10,7 @@
 	}: { conditions?: VisibilityCondition[]; children: Snippet<[boolean]> } = $props();
 
 	let mediaMatches = $state<Record<string, boolean>>({});
+	let selectedStates = $derived(entityStates(visibilityEntityIds(conditions)));
 
 	// (re)subscribes to just the media queries this item's conditions use,
 	// tearing down the previous set's listeners whenever conditions change
@@ -45,7 +46,7 @@
 		};
 	});
 
-	let visible = $derived(evaluateVisibility(conditions, $states, mediaMatches));
+	let visible = $derived(evaluateVisibility(conditions, $selectedStates, mediaMatches));
 </script>
 
 {@render children(visible)}

@@ -2,6 +2,7 @@ import { get } from 'svelte/store';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
 	createConnection,
+	createLongLivedTokenAuth,
 	ERR_INVALID_AUTH,
 	getAuth,
 	type Auth,
@@ -19,6 +20,7 @@ import {
 vi.mock('home-assistant-js-websocket', async (importOriginal) => ({
 	...(await importOriginal<typeof import('home-assistant-js-websocket')>()),
 	createConnection: vi.fn(),
+	createLongLivedTokenAuth: vi.fn(),
 	getAuth: vi.fn(),
 	subscribeEntities: vi.fn(),
 	subscribeConfig: vi.fn(),
@@ -34,6 +36,26 @@ afterEach(() => {
 });
 
 describe('authentication', () => {
+	it('uses the direct server bridge without persisting a Home Assistant token', async () => {
+		const auth = { expired: false } as Auth;
+		const socket = {
+			close: vi.fn(),
+			addEventListener: vi.fn(),
+			subscribeMessage: vi.fn(async () => async () => {})
+		} as unknown as Connection;
+		vi.mocked(createLongLivedTokenAuth).mockReturnValue(auth);
+		vi.mocked(createConnection).mockResolvedValue(socket);
+
+		await authentication({ hassUrl: '__server_proxy__', serverAuth: true });
+
+		expect(createLongLivedTokenAuth).toHaveBeenCalledWith(
+			window.location.origin,
+			'hearth-server-proxy'
+		);
+		expect(getAuth).not.toHaveBeenCalled();
+		expect(localStorage.getItem('hearthTokens')).toBeNull();
+	});
+
 	it('keeps the caller retrying when the Home Assistant URL is missing', async () => {
 		health.set('connected');
 		await expect(authentication({})).rejects.toThrow('Home Assistant URL is not configured');

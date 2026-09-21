@@ -1,10 +1,11 @@
 <script lang="ts">
-	import { states } from '$lib/core/ha/entities';
+	import { entityState } from '$lib/core/ha/entities';
 	import { callEntityService } from '$lib/core/ha/commands';
 
 	let { entity }: { entity: string } = $props();
 
-	let stateObj = $derived($states?.[entity]);
+	let selectedEntity = $derived(entityState(entity));
+	let stateObj = $derived($selectedEntity);
 	let domain = $derived(entity.split('.')[0]);
 	let options = $derived<string[]>(
 		Array.isArray(stateObj?.attributes?.options) ? stateObj.attributes.options : []

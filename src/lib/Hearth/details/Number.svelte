@@ -1,11 +1,12 @@
 <script lang="ts">
 	import { lang } from '$lib/core/i18n';
-	import { states, sensorNumber } from '$lib/core/ha/entities';
+	import { entityState, sensorNumber } from '$lib/core/ha/entities';
 	import { callEntityService } from '$lib/core/ha/commands';
 
 	let { entity }: { entity: string } = $props();
 
-	let stateObj = $derived($states?.[entity]);
+	let selectedEntity = $derived(entityState(entity));
+	let stateObj = $derived($selectedEntity);
 	let attributes = $derived(stateObj?.attributes ?? {});
 	let domain = $derived(entity.split('.')[0]);
 	let min = $derived(typeof attributes.min === 'number' ? attributes.min : 0);

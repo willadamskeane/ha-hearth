@@ -2,7 +2,7 @@
 	import { lang } from '$lib/core/i18n';
 	import { activateOnKeyboard } from './interaction';
 	import Ripple from '$lib/ui/actions/ripple';
-	import { states } from '$lib/core/ha/entities';
+	import { entityState } from '$lib/core/ha/entities';
 	import { getSupport } from '$lib/core/ha/entities';
 	import { PRESS_RIPPLE } from './config';
 	import { callEntityService } from '$lib/core/ha/commands';
@@ -17,7 +17,8 @@
 		{ label: $lang('fan_speed_high'), value: 100 }
 	]);
 
-	let fan = $derived($states?.[entity]);
+	let selectedEntity = $derived(entityState(entity));
+	let fan = $derived($selectedEntity);
 	let attributes = $derived(fan?.attributes);
 	let on = $derived(fan?.state === 'on');
 	let speedPct = $derived(on ? Math.round(attributes?.percentage ?? 0) : 0);

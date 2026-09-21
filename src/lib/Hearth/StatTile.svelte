@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { lang } from '$lib/core/i18n';
-	import { states } from '$lib/core/ha/entities';
+	import { entityState } from '$lib/core/ha/entities';
 	import type { VerdictBands } from '$lib/core/domains/sensor';
 	import { hearthEditMode, popup } from './store';
 	import { airQualityVerdict } from '$lib/core/domains/sensor';
@@ -12,7 +12,8 @@
 		verdictBands = undefined
 	}: { entity: string; name?: string; verdictBands?: false | VerdictBands } = $props();
 
-	let stateObj = $derived($states?.[entity]);
+	let selectedEntity = $derived(entityState(entity));
+	let stateObj = $derived($selectedEntity);
 	let availability = $derived(entityAvailability(stateObj));
 	let label = $derived(name || stateObj?.attributes?.friendly_name || entity);
 	let value = $derived(sensorNumber(stateObj?.state));
@@ -26,7 +27,7 @@
 				? availability === 'missing'
 					? $lang('hearth_missing_entity')
 					: $lang(availability)
-				: stateObj.state
+				: (stateObj?.state ?? '')
 			: value % 1 === 0
 				? String(value)
 				: value.toFixed(1)

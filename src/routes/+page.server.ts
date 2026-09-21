@@ -89,6 +89,11 @@ export async function load({ request }: { request: Request }): Promise<{
 	configuration.hassUrl =
 		request.headers.get('x-hearth-hass-url') ||
 		(process.env.ADDON === 'true' ? undefined : process.env.HASS_URL || undefined);
+	if (request.headers.get('x-hearth-server-auth') === '1') {
+		configuration.serverAuth = true;
+		configuration.hassUrl = '__server_proxy__';
+	}
+	if (request.headers.get('x-hearth-low-power') === '1') configuration.serverLowPower = true;
 
 	// Load the selected language with English fallback.
 	const dir = dev ? './static' : './build/client';

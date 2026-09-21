@@ -2,7 +2,7 @@
 	import { lang, fill } from '$lib/core/i18n';
 	import { ICON } from '../../iconSizes';
 	import Ripple from '$lib/ui/actions/ripple';
-	import { states } from '$lib/core/ha/entities';
+	import { entityState } from '$lib/core/ha/entities';
 	import { PRESS_RIPPLE } from '../../config';
 	import type { OverviewCard } from '../../config';
 	import { hearthEditMode } from '../../store';
@@ -28,13 +28,16 @@
 		error: 'hearth_vacuum_needs_help'
 	};
 
-	let entity = $derived(card.entity ? $states?.[card.entity] : undefined);
+	let selectedEntity = $derived(entityState(card.entity));
+	let selectedBattery = $derived(entityState(card.battery_entity));
+	let selectedBin = $derived(entityState(card.bin_entity));
+	let entity = $derived($selectedEntity);
 	let battery = $derived(
 		card.battery_entity
-			? sensorNumber($states?.[card.battery_entity]?.state)
+			? sensorNumber($selectedBattery?.state)
 			: sensorNumber(String(entity?.attributes?.battery_level ?? ''))
 	);
-	let bin = $derived(card.bin_entity ? sensorNumber($states?.[card.bin_entity]?.state) : null);
+	let bin = $derived(card.bin_entity ? sensorNumber($selectedBin?.state) : null);
 	let running = $derived(
 		card.entity ? entityActiveFor(card.entity, entity, $controlOverrides) : false
 	);

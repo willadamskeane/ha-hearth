@@ -2,7 +2,7 @@
 	import EmptyState from '../../EmptyState.svelte';
 	import { lang } from '$lib/core/i18n';
 	import { connected } from '$lib/core/ha/connection';
-	import { states, sensorNumber, entityActive } from '$lib/core/ha/entities';
+	import { entityState, sensorNumber, entityActive } from '$lib/core/ha/entities';
 	import {
 		cachedData,
 		fetchStateHistory,
@@ -15,7 +15,8 @@
 	let { widget }: { widget: ChartWidget } = $props();
 
 	let entity = $derived(widget.entity ?? '');
-	let stateObj = $derived($states?.[entity]);
+	let selectedEntity = $derived(entityState(entity));
+	let stateObj = $derived($selectedEntity);
 	let style = $derived(widget.style ?? 'line');
 	let period = $derived(widget.period ?? 'day');
 	let label = $derived(widget.name || stateObj?.attributes?.friendly_name || entity);

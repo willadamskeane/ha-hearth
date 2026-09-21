@@ -5,7 +5,7 @@
 	import { lang, selectedLanguage } from '$lib/core/i18n';
 	import { dateKey, parseLocalDate } from '$lib/core/i18n/time';
 	import { timer } from '$lib/core/app/clock';
-	import { states } from '$lib/core/ha/entities';
+	import { entityState } from '$lib/core/ha/entities';
 	import { PRESS_RIPPLE, type RailWidget } from '../../config';
 	import { clockTimeOptions } from '../../clock';
 	import { fetchCalendarEvents, startDataRefresh, type CalendarEvent } from '$lib/core/ha/history';
@@ -71,6 +71,7 @@
 	// event times follow the rail clock's hour format, so 17:00 on the clock is
 	// never "5:00 PM" one widget below it
 	let configuredClock = $derived($hearthConfig.rail.find((widget) => widget.type === 'clock'));
+	let selectedTravel = $derived(entityState(widget.travel_entity));
 
 	function clockTime(date: Date) {
 		return date.toLocaleTimeString(
@@ -93,9 +94,7 @@
 				})} `;
 		if (next.allDay) return `${day}${$lang('hearth_all_day')}`.trim();
 		let line = `${day}${clockTime(next.start)}`;
-		const travelMinutes = widget.travel_entity
-			? sensorNumber($states?.[widget.travel_entity]?.state)
-			: null;
+		const travelMinutes = widget.travel_entity ? sensorNumber($selectedTravel?.state) : null;
 		if (travelMinutes !== null) {
 			const leave = new Date(next.start.getTime() - travelMinutes * 60_000);
 			line += ` · ${$lang('hearth_leave_by')} ${clockTime(leave)}`;

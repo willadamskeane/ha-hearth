@@ -1,12 +1,13 @@
 <script lang="ts">
 	import { lang } from '$lib/core/i18n';
-	import { states } from '$lib/core/ha/entities';
+	import { entityState } from '$lib/core/ha/entities';
 	import { callEntityService } from '$lib/core/ha/commands';
 	import { requestConfirmation } from '../store';
 
 	let { entity }: { entity: string } = $props();
 
-	let stateObj = $derived($states?.[entity]);
+	let selectedEntity = $derived(entityState(entity));
+	let stateObj = $derived($selectedEntity);
 	let locked = $derived(stateObj?.state === 'locked');
 	// supported_features bit 1: the lock can also open (a latch)
 	let canOpen = $derived(((stateObj?.attributes?.supported_features ?? 0) & 1) === 1);

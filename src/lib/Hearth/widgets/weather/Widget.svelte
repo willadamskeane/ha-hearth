@@ -3,7 +3,7 @@
 	import { connected } from '$lib/core/ha/connection';
 	import { subscribeForecast } from '$lib/core/ha/history';
 	import { lang, selectedLanguage } from '$lib/core/i18n';
-	import { states } from '$lib/core/ha/entities';
+	import { entityState } from '$lib/core/ha/entities';
 	import Icon from '../../Icon.svelte';
 
 	import type { WeatherWidget } from './descriptor';
@@ -34,7 +34,8 @@
 		temp: string;
 	}
 
-	let entity = $derived(weatherEntity ? $states?.[weatherEntity] : undefined);
+	let selectedEntity = $derived(entityState(weatherEntity));
+	let entity = $derived($selectedEntity);
 	let condition = $derived(entity?.state ?? '');
 	let temperature = $derived(entity?.attributes?.temperature);
 	let apparent = $derived(entity?.attributes?.apparent_temperature);

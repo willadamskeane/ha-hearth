@@ -3,7 +3,7 @@
 	import { lang } from '$lib/core/i18n';
 	import { onDestroy } from 'svelte';
 	import Ripple from '$lib/ui/actions/ripple';
-	import { states } from '$lib/core/ha/entities';
+	import { entityStates } from '$lib/core/ha/entities';
 	import { PRESS_RIPPLE, type VacuumModeRef } from './config';
 	import { getHearthInteractionMode } from './interaction';
 	import { callEntityService } from '$lib/core/ha/commands';
@@ -21,6 +21,14 @@
 		batteryEntity?: string;
 		binEntity?: string;
 	} = $props();
+	let selectedStates = $derived(
+		entityStates([
+			entity,
+			...(batteryEntity ? [batteryEntity] : []),
+			...(binEntity ? [binEntity] : []),
+			...modes.map((mode) => mode.entity)
+		])
+	);
 
 	const readonly = getHearthInteractionMode() !== 'runtime';
 
@@ -51,21 +59,21 @@
 	}
 
 	function modeName(mode: VacuumModeRef) {
-		return mode.name || $states?.[mode.entity]?.attributes?.friendly_name || mode.entity;
+		return mode.name || $selectedStates[mode.entity]?.attributes?.friendly_name || mode.entity;
 	}
 
 	function modeMeta(mode: VacuumModeRef) {
 		return [mode.detail, mode.duration].filter(Boolean).join(' · ');
 	}
 
-	let vacuum = $derived($states?.[entity]);
+	let vacuum = $derived($selectedStates[entity]);
 	let status = $derived($lang(statusKeys[vacuum?.state ?? ''] ?? 'unavailable'));
 	let battery = $derived(
 		batteryEntity
-			? percent($states?.[batteryEntity]?.state)
+			? percent($selectedStates[batteryEntity]?.state)
 			: percent(vacuum?.attributes?.battery_level)
 	);
-	let bin = $derived(binEntity ? percent($states?.[binEntity]?.state) : null);
+	let bin = $derived(binEntity ? percent($selectedStates[binEntity]?.state) : null);
 	let statusLine = $derived(
 		[status, battery === null ? null : `${battery}%`, bin === null ? null : `bin ${bin}%`]
 			.filter(Boolean)

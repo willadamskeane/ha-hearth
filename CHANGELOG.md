@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.4
+
+- Add an automatic low-power rendering mode for older Android kiosks, removing progressive backdrop blurs, animated drop shadows and other expensive compositor effects while preserving the full visual mode on capable clients.
+- Coalesce Home Assistant state bursts to animation frames and subscribe runtime surfaces only to the entities they render, preventing unrelated updates across thousands of entities from rerendering the dashboard.
+- Add an IP-restricted direct add-on route whose server-side WebSocket and HTTP proxy authenticate to Home Assistant without exposing the Supervisor credential to the kiosk browser.
+
 ## 0.1.3
 
 - Use the live Home Assistant frontend origin for Ingress authentication so secure-context proxies can reuse the frontend session without an origin mismatch or blocked OAuth redirect.

@@ -19,7 +19,7 @@ import {
 	type HassServices
 } from 'home-assistant-js-websocket';
 import type { Configuration, PersistentNotification } from '../app/configuration';
-import { states } from './entities';
+import { cancelQueuedStates, queueStates } from './entities';
 
 /*
  * The one Home Assistant connection. Everything that reaches the server goes
@@ -127,7 +127,12 @@ export async function authentication(
 	let activeTokenStorage = hearthTokenStorage;
 
 	try {
-		if (configuration?.token) {
+		if (configuration.serverAuth) {
+			// The direct add-on route replaces this placeholder in its trusted,
+			// server-side WebSocket bridge. No Home Assistant credential reaches
+			// browser storage or JavaScript.
+			auth = createLongLivedTokenAuth(window.location.origin, 'hearth-server-proxy');
+		} else if (configuration?.token) {
 			auth = createLongLivedTokenAuth(configuration.hassUrl, configuration.token);
 		} else if (navigator.userAgent.includes('Home Assistant')) {
 			// the companion app requires token authentication
@@ -175,7 +180,7 @@ export async function authentication(
 
 		// these three keep themselves alive across reconnects inside the library
 		subscribeEntities(conn, (hassEntities) => {
-			if (get(connection) === conn) states.set(hassEntities);
+			if (get(connection) === conn) queueStates(hassEntities);
 		});
 		subscribeConfig(conn, (hassConfig) => {
 			if (get(connection) === conn) config.set(hassConfig);
@@ -326,6 +331,7 @@ export function startConnection(configuration: Configuration, hooks: ConnectionH
 export function stopConnection() {
 	if (retryTimer) clearInterval(retryTimer);
 	retryTimer = undefined;
+	cancelQueuedStates();
 	// an attempt still awaiting createConnection sees a stale run and discards its socket
 	currentRun += 1;
 	const previous = get(connection);

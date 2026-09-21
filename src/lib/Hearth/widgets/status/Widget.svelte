@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { lang, fill } from '$lib/core/i18n';
 	import { ICON } from '../../iconSizes';
-	import { states } from '$lib/core/ha/entities';
+	import { entityState, entityStates } from '$lib/core/ha/entities';
 	import { hearthConfig } from '../../store';
-	import { attentionItems } from '../../attention';
+	import { attentionItems, displayedEntityIds } from '../../attention';
 	import Icon from '../../Icon.svelte';
 
 	import type { StatusWidget } from './descriptor';
@@ -13,17 +13,21 @@
 	let text = $derived(widget.text);
 	let entity = $derived(widget.entity);
 
-	let entityState = $derived(entity ? $states?.[entity]?.state : undefined);
+	let selectedEntity = $derived(entityState(entity));
+	let selectedAttentionStates = $derived(
+		entityStates(!text && !entity ? displayedEntityIds($hearthConfig) : [])
+	);
+	let currentState = $derived($selectedEntity?.state);
 	let label = $derived(
-		entityState !== undefined
-			? `${text ? `${text} ` : ''}${entityState.charAt(0).toUpperCase()}${entityState.slice(1)}`
+		currentState !== undefined
+			? `${text ? `${text} ` : ''}${currentState.charAt(0).toUpperCase()}${currentState.slice(1)}`
 			: (text ?? '')
 	);
 
 	// without configured content the widget reports actual unresolved conditions;
 	// nothing unresolved renders as nothing, not as a nominal platitude
 	let autoMode = $derived(!text && !entity);
-	let attention = $derived(autoMode ? attentionItems($hearthConfig, $states) : []);
+	let attention = $derived(autoMode ? attentionItems($hearthConfig, $selectedAttentionStates) : []);
 </script>
 
 {#if autoMode}

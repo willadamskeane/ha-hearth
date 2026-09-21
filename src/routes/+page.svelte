@@ -8,6 +8,7 @@
 	import { configuration } from '$lib/core/app/configuration';
 	import { disposeHaptics, haptics, startPressFeedback } from '$lib/core/app/haptics';
 	import { motion } from '$lib/core/app/motion';
+	import { applyPerformanceMode, resolveLowPower } from '$lib/core/app/performance';
 	import { connected } from '$lib/core/ha/connection';
 	import { lang, selectedLanguage, translation } from '$lib/core/i18n';
 	import { states } from '$lib/core/ha/entities';
@@ -48,12 +49,15 @@
 	// svelte-ignore state_referenced_locally
 	$selectedLanguage = data?.configuration?.locale || 'en';
 	if (browser) document.documentElement.lang = $selectedLanguage;
+	const lowPowerMode = browser && resolveLowPower($configuration, navigator);
+	if (browser) applyPerformanceMode(lowPowerMode);
 
 	// motion:false in configuration.yaml disables transitions app-wide, and so
 	// does the OS reduced-motion setting unless motion is explicitly true
 	const reducedMotion = browser && matchMedia('(prefers-reduced-motion: reduce)').matches;
 	// svelte-ignore state_referenced_locally
 	if (
+		lowPowerMode ||
 		data?.configuration?.motion === false ||
 		(reducedMotion && data?.configuration?.motion !== true)
 	) {

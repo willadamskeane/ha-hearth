@@ -1,11 +1,12 @@
 <script lang="ts">
 	import { lang } from '$lib/core/i18n';
-	import { states } from '$lib/core/ha/entities';
+	import { entityState } from '$lib/core/ha/entities';
 	import { vacuumCommand } from '$lib/core/domains/vacuum';
 
 	let { entity }: { entity: string } = $props();
 
-	let stateObj = $derived($states?.[entity]);
+	let selectedEntity = $derived(entityState(entity));
+	let stateObj = $derived($selectedEntity);
 	let vacuumState = $derived(stateObj?.state);
 	let battery = $derived(stateObj?.attributes?.battery_level);
 </script>

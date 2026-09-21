@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { lang } from '$lib/core/i18n';
 	import { activateOnKeyboard } from './interaction';
-	import { states } from '$lib/core/ha/entities';
+	import { entityState } from '$lib/core/ha/entities';
 	import type { SliderUpdateMode } from '$lib/core/app/configuration';
 	import Ripple from '$lib/ui/actions/ripple';
 	import { PRESS_RIPPLE } from './config';
@@ -10,7 +10,7 @@
 	import { callEntityService, controlOverrides } from '$lib/core/ha/commands';
 	import {
 		hexToRgb,
-		lightViewFor,
+		lightViewForEntity,
 		setLightColor,
 		setLightLevel,
 		setLightTemp
@@ -22,7 +22,9 @@
 		sliderUpdates = 'continuous'
 	}: { entity: string; sliderUpdates?: SliderUpdateMode } = $props();
 
-	let view = $derived(lightViewFor(entity, $states, $controlOverrides));
+	let selectedEntity = $derived(entityState(entity));
+	let stateObj = $derived($selectedEntity);
+	let view = $derived(lightViewForEntity(entity, stateObj, $controlOverrides));
 	// tab choice is local UI state; the light's actual mode is the default
 	let tabChoice = $state<'temp' | 'color' | 'white' | null>(null);
 	let mode = $derived(tabChoice ?? view.mode);
@@ -30,7 +32,7 @@
 		`${view.kelvin}K · ${$lang(view.kelvin < 3300 ? 'hearth_warm_white' : view.kelvin < 5000 ? 'hearth_neutral_white' : 'hearth_cool_white')}`
 	);
 
-	let attributes = $derived($states?.[entity]?.attributes ?? {});
+	let attributes = $derived(stateObj?.attributes ?? {});
 	let colorModes: string[] = $derived(
 		Array.isArray(attributes.supported_color_modes) ? attributes.supported_color_modes : []
 	);

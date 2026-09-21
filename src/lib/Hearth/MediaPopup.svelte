@@ -4,7 +4,7 @@
 	import { ICON } from './iconSizes';
 	import { lang, fill } from '$lib/core/i18n';
 	import { activateOnKeyboard } from './interaction';
-	import { states } from '$lib/core/ha/entities';
+	import { entityState } from '$lib/core/ha/entities';
 	import { timer } from '$lib/core/app/clock';
 	import { horizontalDrag } from './drag';
 	import {
@@ -28,7 +28,7 @@
 	} from '$lib/core/ha/commands';
 	import {
 		cycleMediaRepeat,
-		mediaVolumeFor,
+		mediaVolumeForEntity,
 		seekMedia,
 		setMediaShuffle,
 		setMediaVolume,
@@ -50,7 +50,8 @@
 		repeatSet: 262144
 	};
 
-	let player = $derived($states?.[entity]);
+	let selectedEntity = $derived(entityState(entity));
+	let player = $derived($selectedEntity);
 	let attributes = $derived(player?.attributes ?? {});
 	let pending = $derived($pendingEntities[entity] !== undefined);
 	let features = $derived(Number(attributes.supported_features ?? 0));
@@ -175,7 +176,7 @@
 		pane = 'queue';
 	}
 
-	let volume = $derived(mediaVolumeFor(entity, $states, $controlOverrides));
+	let volume = $derived(mediaVolumeForEntity(entity, player, $controlOverrides));
 </script>
 
 <div class="sheet" onclick={(event) => event.stopPropagation()} role="presentation">
@@ -653,7 +654,7 @@
 		border-radius: var(--h-radius-md);
 		background: var(--h-art-scrim-1);
 		border: 1px solid var(--h-on-art-line);
-		backdrop-filter: blur(10px);
+		backdrop-filter: var(--h-overlay-blur, blur(10px));
 		padding: 16px 14px;
 		display: flex;
 		flex-direction: column;

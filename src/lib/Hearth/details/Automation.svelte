@@ -1,13 +1,14 @@
 <script lang="ts">
 	import { lang } from '$lib/core/i18n';
-	import { states } from '$lib/core/ha/entities';
+	import { entityState } from '$lib/core/ha/entities';
 	import { callEntityService } from '$lib/core/ha/commands';
 	import { relativeTime } from '$lib/core/i18n/time';
 	import { selectedLanguage } from '$lib/core/i18n';
 
 	let { entity }: { entity: string } = $props();
 
-	let stateObj = $derived($states?.[entity]);
+	let selectedEntity = $derived(entityState(entity));
+	let stateObj = $derived($selectedEntity);
 	let on = $derived(stateObj?.state === 'on');
 	let lastTriggered = $derived(stateObj?.attributes?.last_triggered as string | undefined);
 </script>

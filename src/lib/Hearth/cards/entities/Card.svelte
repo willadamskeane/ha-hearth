@@ -2,7 +2,7 @@
 	import { ICON } from '../../iconSizes';
 	import { lang } from '$lib/core/i18n';
 	import Ripple from '$lib/ui/actions/ripple';
-	import { states } from '$lib/core/ha/entities';
+	import { entityIds, entityStates } from '$lib/core/ha/entities';
 	import {
 		findOverviewCard,
 		PRESS_RIPPLE,
@@ -35,17 +35,23 @@
 	const preview = getHearthInteractionMode() === 'preview';
 	let resolvedEntities = $derived.by(() => {
 		const explicitIds = new Set(card.entities.map((ref) => ref.entity));
-		const matched = wildcardEntityIds(card.wildcard, Object.keys($states ?? {}))
+		const matched = wildcardEntityIds(card.wildcard, $entityIds)
 			.filter((entityId) => !explicitIds.has(entityId))
 			.map((entityId): EntityRef => ({ entity: entityId }));
 		return [...card.entities, ...matched];
 	});
+	let selectedStates = $derived(
+		entityStates([
+			...resolvedEntities.map((ref) => ref.entity),
+			...(card.summary_entity ? [card.summary_entity] : [])
+		])
+	);
 
 	let summary = $derived(
 		formatGroupSummary(
 			entityGroupSummary(
 				resolvedEntities.map((ref) => ref.entity),
-				$states
+				$selectedStates
 			),
 			$lang
 		)
@@ -54,8 +60,8 @@
 		card.summary ??
 			(card.summary_entity
 				? [
-						$states?.[card.summary_entity]?.state ?? '-',
-						$states?.[card.summary_entity]?.attributes?.unit_of_measurement ?? ''
+						$selectedStates[card.summary_entity]?.state ?? '-',
+						$selectedStates[card.summary_entity]?.attributes?.unit_of_measurement ?? ''
 					]
 						.join(' ')
 						.trim()

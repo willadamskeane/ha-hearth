@@ -1,9 +1,129 @@
-import { derived, writable } from 'svelte/store';
+import { writable, type Readable, type Subscriber, type Writable } from 'svelte/store';
 import type { HassEntities, HassEntity } from 'home-assistant-js-websocket';
 import { domainDescriptor } from '../domains';
 
-/** Every entity state, replaced wholesale on each websocket update. */
-export const states = writable<HassEntities>();
+const backingStates = writable<HassEntities>();
+const backingEntityIds = writable<string[]>([]);
+let latestStates: HassEntities | undefined;
+let latestEntityIds: string[] = [];
+const entityListeners = new Map<string, Set<Subscriber<HassEntity | undefined>>>();
+const entitySetListeners = new Set<{
+	ids: Set<string>;
+	run: Subscriber<HassEntities>;
+}>();
+
+function publishStates(next: HassEntities | undefined) {
+	const previous = latestStates;
+	latestStates = next;
+	backingStates.set(next as HassEntities);
+	const nextIds = Object.keys(next ?? {});
+	if (
+		nextIds.length !== latestEntityIds.length ||
+		nextIds.some((entityId, index) => entityId !== latestEntityIds[index])
+	) {
+		latestEntityIds = nextIds;
+		backingEntityIds.set(nextIds);
+	}
+	for (const [entityId, listeners] of entityListeners) {
+		const before = previous?.[entityId];
+		const after = next?.[entityId];
+		if (before === after) continue;
+		for (const listener of listeners) listener(after);
+	}
+	for (const listener of entitySetListeners) {
+		if (![...listener.ids].some((entityId) => previous?.[entityId] !== next?.[entityId])) continue;
+		listener.run(selectEntities(next, listener.ids));
+	}
+}
+
+function selectEntities(
+	source: HassEntities | undefined,
+	entityIds: Iterable<string>
+): HassEntities {
+	const selected: HassEntities = {};
+	for (const entityId of entityIds) {
+		const entity = source?.[entityId];
+		if (entity) selected[entityId] = entity;
+	}
+	return selected;
+}
+
+/** Every entity state. Prefer entityState() in runtime components. */
+export const states: Writable<HassEntities> = {
+	subscribe: backingStates.subscribe,
+	set: publishStates,
+	update(updater) {
+		publishStates(updater(latestStates as HassEntities));
+	}
+};
+
+/**
+ * A selector store that only notifies when this entity's object changed. The
+ * websocket library preserves object identity for unchanged entities, so an
+ * unrelated sensor update costs no Svelte work in subscribers.
+ */
+export function entityState(entityId: string | undefined): Readable<HassEntity | undefined> {
+	return {
+		subscribe(run) {
+			if (!entityId) {
+				run(undefined);
+				return () => {};
+			}
+			let listeners = entityListeners.get(entityId);
+			if (!listeners) entityListeners.set(entityId, (listeners = new Set()));
+			listeners.add(run);
+			run(latestStates?.[entityId]);
+			return () => {
+				listeners?.delete(run);
+				if (listeners?.size === 0) entityListeners.delete(entityId);
+			};
+		}
+	};
+}
+
+/** A small state map that updates only when one of the requested entities changes. */
+export function entityStates(entityIds: string[] | undefined): Readable<HassEntities> {
+	const ids = new Set(entityIds?.filter(Boolean) ?? []);
+	return {
+		subscribe(run) {
+			const listener = { ids, run };
+			entitySetListeners.add(listener);
+			run(selectEntities(latestStates, ids));
+			return () => entitySetListeners.delete(listener);
+		}
+	};
+}
+
+let queuedStates: HassEntities | undefined;
+let queuedFrame: number | ReturnType<typeof setTimeout> | undefined;
+
+/** Coalesce websocket bursts into at most one application update per frame. */
+export function queueStates(next: HassEntities): void {
+	queuedStates = next;
+	if (queuedFrame !== undefined) return;
+	const flush = () => {
+		queuedFrame = undefined;
+		const current = queuedStates;
+		queuedStates = undefined;
+		if (current) publishStates(current);
+	};
+	queuedFrame =
+		typeof requestAnimationFrame === 'function'
+			? requestAnimationFrame(flush)
+			: setTimeout(flush, 0);
+}
+
+export function cancelQueuedStates(): void {
+	if (queuedFrame !== undefined) {
+		if (typeof cancelAnimationFrame === 'function' && typeof queuedFrame === 'number') {
+			cancelAnimationFrame(queuedFrame);
+		} else {
+			clearTimeout(queuedFrame as ReturnType<typeof setTimeout>);
+		}
+	}
+	queuedFrame = undefined;
+	queuedStates = undefined;
+}
 
 /**
  * Returns the domain from a given entity_id
@@ -169,8 +289,8 @@ export function entityGroupSummary(
 	};
 }
 
-/** Every known entity id, for pickers and editor autocompletion. */
-export const entityIds = derived(states, ($states) => Object.keys($states ?? {}));
+/** Every known entity id; ordinary state changes do not republish this list. */
+export const entityIds: Readable<string[]> = { subscribe: backingEntityIds.subscribe };
 
 /** Which of the named feature bits are set in supported_features. */
 export function getSupport(

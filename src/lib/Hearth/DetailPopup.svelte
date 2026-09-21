@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { lang } from '$lib/core/i18n';
-	import { states, getDomain, sensorNumber } from '$lib/core/ha/entities';
+	import { entityState, getDomain, sensorNumber } from '$lib/core/ha/entities';
 	import StateLogic from '$lib/ui/StateLogic.svelte';
 	import { detailLoader } from './details';
 	import SensorPopup from './SensorPopup.svelte';
@@ -19,7 +19,8 @@
 		'id'
 	]);
 
-	let stateObj = $derived($states?.[entity]);
+	let selectedEntity = $derived(entityState(entity));
+	let stateObj = $derived($selectedEntity);
 	let domain = $derived(getDomain(entity) ?? '');
 	let loader = $derived(detailLoader(entity));
 	let numeric = $derived(
