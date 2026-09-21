@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.5
+
+- Hide the Home Assistant panel title bar above the Ingress frame so wall tablets get the full screen height. The frame now asks the hosting frontend to enter kiosk mode on start, which is the only supported way to remove chrome that Home Assistant draws in its own `ha-panel-app` shadow root.
+
 ## 0.1.4
 
 - Add an automatic low-power rendering mode for older Android kiosks, removing progressive backdrop blurs, animated drop shadows and other expensive compositor effects while preserving the full visual mode on capable clients.

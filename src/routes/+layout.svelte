@@ -1,6 +1,11 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
+	import { announceIngressPanel } from '$lib/core/ha/ingress-panel';
 	let { children }: { children: Snippet } = $props();
+
+	// Runs as early as the app can, so the frontend drops its panel chrome while
+	// the frame is still starting rather than re-rendering over a finished page.
+	announceIngressPanel();
 </script>
 
 <svelte:head>
