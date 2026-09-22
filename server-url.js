@@ -20,14 +20,9 @@ export function resolvePublicHassUrl(headers, environment) {
 	if (environment.publicHassUrl) return environment.publicHassUrl;
 	if (!environment.addon) return environment.hassUrl;
 
-	const source = firstHeader(headers['x-hass-source']);
 	const forwardedProto = firstHeader(headers['x-forwarded-proto']);
 	const forwardedHost = firstHeader(headers['x-forwarded-host']);
-	if (
-		source === 'core.ingress' &&
-		(forwardedProto === 'http' || forwardedProto === 'https') &&
-		forwardedHost
-	) {
+	if (isTrustedIngressRequest(headers)) {
 		return `${forwardedProto}://${forwardedHost}`;
 	}
 
@@ -40,6 +35,25 @@ export function resolvePublicHassUrl(headers, environment) {
 	if (requestPort !== environment.exposedPort) return undefined;
 	url.port = environment.hassPort;
 	return url.origin;
+}
+
+/**
+ * Return whether the request came through Supervisor Ingress.
+ *
+ * Kiosk Satellite can rewrite the browser path to a short proxy route, so the
+ * request-level marker is more reliable than matching `/api/hassio_ingress/`.
+ *
+ * @param {import('node:http').IncomingHttpHeaders} headers
+ */
+export function isTrustedIngressRequest(headers) {
+	const source = firstHeader(headers['x-hass-source']);
+	const forwardedProto = firstHeader(headers['x-forwarded-proto']);
+	const forwardedHost = firstHeader(headers['x-forwarded-host']);
+	return (
+		source === 'core.ingress' &&
+		(forwardedProto === 'http' || forwardedProto === 'https') &&
+		Boolean(forwardedHost)
+	);
 }
 
 /** @param {string | string[] | undefined} value */

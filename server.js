@@ -4,7 +4,7 @@ import { createServer } from 'node:http';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import dotenv from 'dotenv';
 import WebSocket, { WebSocketServer } from 'ws';
-import { resolvePublicHassUrl } from './server-url.js';
+import { isTrustedIngressRequest, resolvePublicHassUrl } from './server-url.js';
 import {
 	isTrustedDirectRequest,
 	parseTrustedClients,
@@ -29,12 +29,14 @@ app.use((request, _response, next) => {
 	delete request.headers['x-hearth-hass-url'];
 	delete request.headers['x-hearth-server-auth'];
 	delete request.headers['x-hearth-low-power'];
+	delete request.headers['x-hearth-ingress'];
 	const trustedDirect = isTrustedDirectRequest(request, directAccess, trustedClients);
 	request.hearthTrustedDirect = trustedDirect;
 	if (trustedDirect) {
 		request.headers['x-hearth-server-auth'] = '1';
 		if (directLowPower) request.headers['x-hearth-low-power'] = '1';
 	}
+	if (isTrustedIngressRequest(request.headers)) request.headers['x-hearth-ingress'] = '1';
 	const publicHassUrl = resolvePublicHassUrl(request.headers, {
 		addon,
 		hassUrl: proxyTarget,

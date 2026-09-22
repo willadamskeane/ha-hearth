@@ -94,6 +94,7 @@ export async function load({ request }: { request: Request }): Promise<{
 		configuration.hassUrl = '__server_proxy__';
 	}
 	if (request.headers.get('x-hearth-low-power') === '1') configuration.serverLowPower = true;
+	if (request.headers.get('x-hearth-ingress') === '1') configuration.ingress = true;
 
 	// Load the selected language with English fallback.
 	const dir = dev ? './static' : './build/client';

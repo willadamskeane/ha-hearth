@@ -131,6 +131,36 @@ describe('authentication', () => {
 		expect(localStorage.getItem('hearthTokens')).toBeNull();
 	});
 
+	it('uses the live proxy origin for a rewritten Kiosk Ingress route', async () => {
+		window.history.replaceState(null, '', '/624a9b35_ha_hearth');
+		const sharedTokens = {
+			access_token: 'existing-access-token',
+			refresh_token: 'existing-refresh-token',
+			hassUrl: 'http://localhost:3000'
+		};
+		localStorage.setItem('hassTokens', JSON.stringify(sharedTokens));
+		const socket = {
+			close: vi.fn(),
+			addEventListener: vi.fn(),
+			subscribeMessage: vi.fn(async () => async () => {})
+		} as unknown as Connection;
+		vi.mocked(getAuth).mockImplementation(async (options) => {
+			if (!options) throw new Error('expected getAuth options');
+			expect(await options.loadTokens?.()).toEqual(sharedTokens);
+			expect(options.hassUrl).toBe('http://localhost:3000');
+			expect(options.redirectUrl).toBeUndefined();
+			return { expired: false } as Auth;
+		});
+		vi.mocked(createConnection).mockResolvedValue(socket);
+
+		await authentication({
+			hassUrl: 'https://homeassistant.local:8123',
+			ingress: true
+		});
+
+		expect(getAuth).toHaveBeenCalledOnce();
+	});
+
 	it('does not start an invalid OAuth redirect when the Ingress session is unavailable', async () => {
 		window.history.replaceState(null, '', '/api/hassio_ingress/session-token/');
 

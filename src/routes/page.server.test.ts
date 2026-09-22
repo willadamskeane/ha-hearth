@@ -40,4 +40,20 @@ describe('Home Assistant URL configuration', () => {
 
 		expect(result.configuration.hassUrl).toBe('http://homeassistant.local:8123');
 	});
+
+	it('marks trusted rewritten Ingress requests for same-origin authentication', async () => {
+		vi.stubEnv('ADDON', 'true');
+
+		const result = await load({
+			request: new Request('http://127.0.0.1:2325/624a9b35_ha_hearth', {
+				headers: {
+					'x-hearth-hass-url': 'https://homeassistant.local:8123',
+					'x-hearth-ingress': '1'
+				}
+			})
+		});
+
+		expect(result.configuration.ingress).toBe(true);
+		expect(result.configuration.hassUrl).toBe('https://homeassistant.local:8123');
+	});
 });

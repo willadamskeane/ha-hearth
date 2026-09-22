@@ -22,6 +22,8 @@ export type Configuration = v.InferOutput<typeof ConfigurationSchema> & {
 	serverAuth?: boolean;
 	/** A trusted direct-port request may force the low-power renderer. */
 	serverLowPower?: boolean;
+	/** The request came through Home Assistant Ingress, including rewritten Kiosk routes. */
+	ingress?: boolean;
 };
 
 export interface PersistentNotification {

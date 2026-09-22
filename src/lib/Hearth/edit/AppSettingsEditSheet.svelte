@@ -86,6 +86,7 @@
 			delete json.hassUrl;
 			delete json.serverAuth;
 			delete json.serverLowPower;
+			delete json.ingress;
 			const response = await fetch(`${base}/_api/save_config`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },

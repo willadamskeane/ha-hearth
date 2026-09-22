@@ -90,8 +90,8 @@ const hearthTokenStorage = createTokenStorage('hearthTokens');
 // frontend remains the owner of this shared token record.
 const ingressTokenStorage = createTokenStorage('hassTokens', false);
 
-function isIngressPage() {
-	return location.pathname.startsWith('/api/hassio_ingress/');
+function isIngressPage(configuration: Configuration) {
+	return configuration.ingress === true || location.pathname.startsWith('/api/hassio_ingress/');
 }
 
 export interface ConnectionHooks {
@@ -145,7 +145,7 @@ export async function authentication(
 			// the configuration supplies a long-lived token
 			throw new Error('A long-lived access token is required in the companion app');
 		} else {
-			const ingress = isIngressPage();
+			const ingress = isIngressPage(configuration);
 			activeTokenStorage = ingress ? ingressTokenStorage : hearthTokenStorage;
 			if (ingress && !(await activeTokenStorage.loadTokens())) {
 				throw new Error('The Home Assistant browser session is unavailable to Ingress');

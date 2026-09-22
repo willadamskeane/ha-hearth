@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
-import { resolvePublicHassUrl } from '../../../server-url.js';
+import { isTrustedIngressRequest, resolvePublicHassUrl } from '../../../server-url.js';
 
 describe('resolvePublicHassUrl', () => {
 	it('uses HASS_URL for a standalone deployment', () => {
@@ -66,5 +66,21 @@ describe('resolvePublicHassUrl', () => {
 				{ addon: true, hassUrl: 'http://homeassistant:8123' }
 			)
 		).toBeUndefined();
+	});
+
+	it('recognizes trusted Supervisor Ingress headers', () => {
+		expect(
+			isTrustedIngressRequest({
+				'x-hass-source': 'core.ingress',
+				'x-forwarded-proto': 'http',
+				'x-forwarded-host': '127.0.0.1:2325'
+			})
+		).toBe(true);
+		expect(
+			isTrustedIngressRequest({
+				'x-forwarded-proto': 'http',
+				'x-forwarded-host': '127.0.0.1:2325'
+			})
+		).toBe(false);
 	});
 });

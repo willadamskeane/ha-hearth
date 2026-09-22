@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.8
+
+- Recognize Home Assistant Ingress even when Kiosk Satellite rewrites the browser route. Hearth now uses the live proxy origin for the shared Home Assistant session, restoring Voice Satellite and `yo billy` wake-word handling after app restarts.
+
 ## 0.1.7
 
 - Fade scroll edges into the page background in low-power mode instead of the surface token. The old fallback painted a 72%-opaque near-white veil over dark presets, which read as a glow across the bottom row rather than a hint that content continues.
