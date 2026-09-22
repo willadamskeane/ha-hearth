@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.9
+
+- Scale the rail energy reading into kWh. Recorder statistics carry the entity's own unit, so a sensor measured in Wh summed to a Wh total while the widget labelled it kWh: today's 7.2 kWh of solar production read as `7234.0 kWh`.
+- Word contact sensors as Open/Closed instead of On/Off. Doors, windows, garage doors and openings now read the way Home Assistant words them.
+
 ## 0.1.8
 
 - Recognize Home Assistant Ingress even when Kiosk Satellite rewrites the browser route. Hearth now uses the live proxy origin for the shared Home Assistant session, restoring Voice Satellite and `yo billy` wake-word handling after app restarts.
