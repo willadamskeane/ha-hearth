@@ -243,6 +243,13 @@
 		color: var(--h-bad-text);
 		border-color: rgb(var(--h-bad-rgb) / 0.35);
 	}
+	/* where the rail folds away this corner is page content; PhoneNav carries the toggle */
+	@media (max-width: 900px) {
+		.edit-toggle {
+			display: none;
+		}
+	}
+
 	@media (max-width: 700px) {
 		.edit-bar {
 			left: 8px;

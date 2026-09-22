@@ -16,7 +16,7 @@ test('the page strip sits at the top and switches pages without scrolling', asyn
 		'aria-current',
 		'page'
 	);
-	await expect(page.getByRole('button', { name: 'Edit Hearth configuration' })).toBeInViewport();
+	await expect(strip.getByRole('button', { name: 'Edit Hearth configuration' })).toBeInViewport();
 	const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
 	expect(overflow).toBe(0);
 });

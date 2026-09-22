@@ -1,15 +1,24 @@
 <script lang="ts">
 	import { lang } from '$lib/core/i18n';
 	import { ICON } from '../iconSizes';
-	import { currentRoom, hearthConfig, hearthEditMode } from '../store';
+	import {
+		currentRoom,
+		enterEditMode,
+		hearthConfig,
+		hearthEditMode,
+		hearthLoadError
+	} from '../store';
 	import Icon from '../Icon.svelte';
 
 	/**
 	 * Page switcher for narrow viewports, where the rail folds under the page
 	 * and its navigation widget would be a screen away. Sticky at the top of
 	 * the scroll container; hidden by CSS above the rail-folds breakpoint.
+	 * It also carries the edit toggle, whose floating home at the rail's foot
+	 * would sit over page content once the rail folds away.
 	 */
-	let { onsearch }: { onsearch: () => void } = $props();
+	let { onsearch, hideEditToggle = false }: { onsearch: () => void; hideEditToggle?: boolean } =
+		$props();
 
 	let hasSearch = $derived(
 		$hearthConfig.rail.some((widget) => widget.type === 'search' && widget.hide_mobile !== true)
@@ -34,6 +43,16 @@
 	{#if hasSearch && !$hearthEditMode}
 		<button type="button" class="search pressable" aria-label={$lang('search')} onclick={onsearch}>
 			<Icon name="search" size={ICON.control} />
+		</button>
+	{/if}
+	{#if !hideEditToggle && !$hearthLoadError && !$hearthEditMode}
+		<button
+			type="button"
+			class="edit pressable"
+			aria-label={$lang('hearth_edit_configuration')}
+			onclick={enterEditMode}
+		>
+			<Icon name="edit" size={ICON.control} />
 		</button>
 	{/if}
 </nav>
@@ -76,7 +95,8 @@
 		}
 
 		.page,
-		.search {
+		.search,
+		.edit {
 			flex: none;
 			display: flex;
 			align-items: center;
@@ -94,7 +114,8 @@
 			cursor: pointer;
 		}
 
-		.search {
+		.search,
+		.edit {
 			width: 44px;
 			padding: 0;
 			justify-content: center;
