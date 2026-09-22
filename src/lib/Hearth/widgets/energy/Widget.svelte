@@ -7,8 +7,11 @@
 	import { fetchStatistics, startDataRefresh } from '$lib/core/ha/history';
 	import { sensorNumber } from '$lib/core/ha/entities';
 	import Icon from '../../Icon.svelte';
+	import { kwhFactor } from './units';
 
 	let { widget }: { widget: Extract<RailWidget, { type: 'energy' }> } = $props();
+
+	let selectedEntity = $derived(entityState(widget.entity));
 
 	const BAR_COUNT = 8;
 	// kWh per hour for today, oldest first; null until the first fetch lands
@@ -44,7 +47,9 @@
 		return startDataRefresh(fetchToday, (value) => (hours = value));
 	});
 
-	let total = $derived(hours ? hours.reduce((sum, value) => sum + value, 0) : null);
+	// statistics carry the sensor's own unit; the reading below is labelled kWh
+	let factor = $derived(kwhFactor($selectedEntity?.attributes?.unit_of_measurement));
+	let total = $derived(hours ? hours.reduce((sum, value) => sum + value, 0) * factor : null);
 	let selectedPrice = $derived(entityState(widget.price_entity));
 
 	let pricePerKwh = $derived(
