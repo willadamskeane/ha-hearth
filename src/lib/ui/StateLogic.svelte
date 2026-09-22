@@ -3,6 +3,7 @@
 	import { entityState as selectEntityState } from '$lib/core/ha/entities';
 	import { isTimestamp, relativeTime } from '$lib/core/i18n/time';
 	import { getDomain } from '$lib/core/ha/entities';
+	import { contactStateKey } from '$lib/core/domains';
 
 	let { entity_id }: { entity_id: string | undefined } = $props();
 	let selectedEntity = $derived(selectEntityState(entity_id));
@@ -13,6 +14,8 @@
 	let brightness = $derived(attributes?.brightness);
 	let percentage = $derived(attributes?.percentage);
 	let media_title = $derived(attributes?.media_title);
+	// a door or window reads open/closed instead of on/off
+	let contactKey = $derived(contactStateKey(entity, entityState));
 
 	const BLANK = '\u00a0';
 </script>
@@ -78,6 +81,10 @@
 	{:else}
 		{attributes?.mode === 'password' ? entityState?.replace(/./g, '•') : entityState}
 	{/if}
+
+	<!-- Contact sensor -->
+{:else if contactKey}
+	{$lang(contactKey)}
 
 	<!-- Timestamp  -->
 {:else if entityState && isTimestamp(entityState)}

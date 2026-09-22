@@ -70,4 +70,32 @@ describe('EntityTile', () => {
 		const { container: cover } = render(EntityTile, { entity: 'cover.blind' });
 		expect(cover.querySelector('[data-id="cover.blind"]')).not.toBeNull();
 	});
+
+	it('words contact sensors as open and closed, not on and off', () => {
+		states.set({
+			'binary_sensor.front_door': hassEntity('binary_sensor.front_door', 'off', {
+				friendly_name: 'Front Door',
+				device_class: 'door'
+			}),
+			'binary_sensor.living_room_window': hassEntity('binary_sensor.living_room_window', 'on', {
+				friendly_name: 'Living Room Window',
+				device_class: 'window'
+			})
+		});
+		render(EntityTile, { entity: 'binary_sensor.front_door' });
+		expect(screen.getByText('Closed')).toBeTruthy();
+		render(EntityTile, { entity: 'binary_sensor.living_room_window' });
+		expect(screen.getByText('Open')).toBeTruthy();
+	});
+
+	it('leaves other binary sensors on their own wording', () => {
+		states.set({
+			'binary_sensor.doorbell_motion': hassEntity('binary_sensor.doorbell_motion', 'on', {
+				friendly_name: 'Doorbell Motion',
+				device_class: 'motion'
+			})
+		});
+		render(EntityTile, { entity: 'binary_sensor.doorbell_motion' });
+		expect(screen.getByText('On')).toBeTruthy();
+	});
 });

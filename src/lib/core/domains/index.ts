@@ -39,6 +39,24 @@ export interface DomainDescriptor {
 const openClosed = (): [string, string] => ['open', 'closed'];
 const toggle = (domain: string) => () => `${domain}.toggle`;
 
+/**
+ * Contact sensors read "Open"/"Closed" rather than "On"/"Off": Home Assistant
+ * words the raw binary state for these device classes, and so does the tile.
+ * Returns the translation key to show, or undefined for anything else.
+ */
+export function contactStateKey(
+	entity: HassEntity | undefined,
+	state: string | undefined
+): 'open' | 'closed' | undefined {
+	const deviceClass = entity?.attributes?.device_class;
+	if (typeof deviceClass !== 'string' || !OPEN_CLOSED_CLASSES.includes(deviceClass)) {
+		return undefined;
+	}
+	if (state === 'on') return 'open';
+	if (state === 'off') return 'closed';
+	return undefined;
+}
+
 const GENERIC: DomainDescriptor = { domain: '', icon: 'category', tap: 'controls' };
 
 const DESCRIPTORS: DomainDescriptor[] = [
