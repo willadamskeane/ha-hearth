@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.10
+
+- Move the edit toggle into the page strip on narrow screens. Below the 900px breakpoint the rail folds away, and the toggle it anchored at the bottom-left corner floated over the first column's tiles on a wall tablet. It is now a pencil button beside search; `?menu=false` still hides it.
+
 ## 0.1.9
 
 - Scale the rail energy reading into kWh. Recorder statistics carry the entity's own unit, so a sensor measured in Wh summed to a Wh total while the widget labelled it kWh: today's 7.2 kWh of solar production read as `7234.0 kWh`.
