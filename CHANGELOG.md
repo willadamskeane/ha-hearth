@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.13
+
+- Clip the narrow-layout status strip only sideways, so the clock and chip borders are no longer cut at the top on wall tablets.
+
 ## 0.1.12
 
 - Show the rail's clock, weather, energy, activity and next-event widgets as a one-line status strip above the page tabs on narrow screens, instead of stacking the whole rail below every page. A rail with nothing else left no longer renders below the page; edit mode keeps the full rail, and `hide_mobile` still hides a widget in both places.
