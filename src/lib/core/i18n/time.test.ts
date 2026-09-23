@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { calendarDaysBetween, dateKey, dateTimeFormat, isTimestamp, parseLocalDate } from './time';
+import {
+	calendarDaysBetween,
+	dateKey,
+	dateTimeFormat,
+	isTimestamp,
+	numberFormat,
+	parseLocalDate
+} from './time';
 
 describe('parseLocalDate', () => {
 	it('reads a date-only value as local midnight', () => {
@@ -58,5 +65,14 @@ describe('dateTimeFormat', () => {
 		expect(dateTimeFormat('de-DE', options)).not.toBe(first);
 		const when = new Date(2026, 8, 22, 21, 7);
 		expect(first.format(when)).toBe(when.toLocaleTimeString('en-US', options));
+	});
+});
+
+describe('numberFormat', () => {
+	it('reuses one formatter per locale and option set', () => {
+		const percent = numberFormat('en-US', { style: 'percent' });
+		expect(numberFormat('en-US', { style: 'percent' })).toBe(percent);
+		expect(percent.format(0.42)).toBe('42%');
+		expect(numberFormat('en-US')).not.toBe(percent);
 	});
 });

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { lang, selectedLanguage, fill } from '$lib/core/i18n';
 	import { entityState as selectEntityState } from '$lib/core/ha/entities';
-	import { isTimestamp, relativeTime } from '$lib/core/i18n/time';
+	import { isTimestamp, numberFormat, relativeTime } from '$lib/core/i18n/time';
 	import { getDomain } from '$lib/core/ha/entities';
 	import { contactStateKey } from '$lib/core/domains';
 
@@ -25,7 +25,7 @@
 	{@const percentage = brightness / 255}
 	<!-- should never be 0% if on -->
 	{@const floor = percentage < 0.01 && percentage > 0 ? 0.01 : percentage}
-	{Intl.NumberFormat($selectedLanguage, { style: 'percent' }).format(floor)}
+	{numberFormat($selectedLanguage, { style: 'percent' }).format(floor)}
 
 	<!-- Media -->
 {:else if media_title && entityState === 'playing'}
@@ -92,7 +92,7 @@
 
 	<!-- Percentage  -->
 {:else if entityState === 'on' && percentage}
-	{Intl.NumberFormat($selectedLanguage, { style: 'percent' }).format(percentage * 0.01)}
+	{numberFormat($selectedLanguage, { style: 'percent' }).format(percentage * 0.01)}
 
 	<!-- State  -->
 {:else if entityState}

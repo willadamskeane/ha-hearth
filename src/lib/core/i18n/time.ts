@@ -25,6 +25,22 @@ export function dateTimeFormat(
 	return format;
 }
 
+const numberFormats = new Map<string, Intl.NumberFormat>();
+
+/** A cached `Intl.NumberFormat`: tiles format brightness and percentages on every render. */
+export function numberFormat(
+	locale: string | undefined,
+	options: Intl.NumberFormatOptions = {}
+): Intl.NumberFormat {
+	const key = `${locale ?? ''}|${JSON.stringify(options)}`;
+	let format = numberFormats.get(key);
+	if (!format) {
+		format = new Intl.NumberFormat(locale, options);
+		numberFormats.set(key, format);
+	}
+	return format;
+}
+
 function relativeTimeFormat(locale: string | undefined): Intl.RelativeTimeFormat {
 	const key = locale ?? '';
 	let format = relativeTimeFormats.get(key);

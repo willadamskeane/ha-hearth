@@ -5,6 +5,7 @@
 	import { lang, selectedLanguage } from '$lib/core/i18n';
 	import { entityState } from '$lib/core/ha/entities';
 	import Icon from '../../Icon.svelte';
+	import { numberFormat } from '$lib/core/i18n/time';
 	import StripChip from '../StripChip.svelte';
 
 	import type { WeatherWidget } from './descriptor';
@@ -43,7 +44,7 @@
 	let sub = $derived(
 		(condition ? $lang(`weather_${condition.replaceAll('-', '_')}`) : '') +
 			(typeof apparent === 'number'
-				? ` · ${$lang('apparent_temperature')} ${Intl.NumberFormat($selectedLanguage).format(Math.round(apparent))}°`
+				? ` · ${$lang('apparent_temperature')} ${numberFormat($selectedLanguage).format(Math.round(apparent))}°`
 				: '')
 	);
 
@@ -86,7 +87,7 @@
 		label={sub}
 	>
 		{typeof temperature === 'number'
-			? Intl.NumberFormat($selectedLanguage).format(Math.round(temperature))
+			? numberFormat($selectedLanguage).format(Math.round(temperature))
 			: '-'}°
 	</StripChip>
 {:else}
@@ -101,7 +102,7 @@
 			<div class="current">
 				<div class="temp">
 					{typeof temperature === 'number'
-						? Intl.NumberFormat($selectedLanguage).format(Math.round(temperature))
+						? numberFormat($selectedLanguage).format(Math.round(temperature))
 						: '-'}°
 				</div>
 				<div class="sub">{sub}</div>
