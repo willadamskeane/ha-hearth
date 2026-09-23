@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.12
+
+- Show the rail's clock, weather, energy, activity and next-event widgets as a one-line status strip above the page tabs on narrow screens, instead of stacking the whole rail below every page. A rail with nothing else left no longer renders below the page; edit mode keeps the full rail, and `hide_mobile` still hides a widget in both places.
+
 ## 0.1.11
 
 - Compact the room header on narrow screens. Where the rail folds away, the icon tile, title and temperature/humidity chips drop to a smaller size and sit closer to the cards, so a wall tablet spends less of its height on the room name the page strip already shows.
