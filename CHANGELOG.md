@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.14
+
+- Move the narrow-layout edit toggle from the end of the page tabs to the end of the status strip, giving the tabs their full width back. Without strip widgets it stays beside the tabs; `?menu=false` still hides it.
+
 ## 0.1.13
 
 - Clip the narrow-layout status strip only sideways, so the clock and chip borders are no longer cut at the top on wall tablets.
