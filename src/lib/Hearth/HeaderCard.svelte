@@ -23,6 +23,18 @@
 		onedit?: () => void;
 	} = $props();
 
+	// where the rail folds away (the PhoneNav breakpoint) the header shares a
+	// small screen with the cards, so it drops to a compact size
+	let narrow = $state(false);
+	$effect(() => {
+		if (typeof window.matchMedia !== 'function') return;
+		const query = window.matchMedia('(max-width: 900px)');
+		const update = () => (narrow = query.matches);
+		update();
+		query.addEventListener('change', update);
+		return () => query.removeEventListener('change', update);
+	});
+
 	let selectedTemp = $derived(entityState(tempEntity));
 	let selectedHumidity = $derived(entityState(humidityEntity));
 
@@ -45,7 +57,11 @@
 	onkeydown={(event) => activateOnKeyboard(event, () => $hearthEditMode && onedit?.())}
 >
 	<div class="icon-tile">
-		<Icon name={icon || 'home'} size={ICON.hero} color="var(--h-accent-text)" />
+		<Icon
+			name={icon || 'home'}
+			size={narrow ? ICON.tile : ICON.hero}
+			color="var(--h-accent-text)"
+		/>
 	</div>
 	<div class="titles">
 		<div class="name">{title}</div>
@@ -146,5 +162,39 @@
 	.chip-label {
 		font-size: var(--h-type-small);
 		color: var(--h-text-5);
+	}
+
+	@media (max-width: 900px) {
+		.header {
+			gap: 12px;
+		}
+
+		.icon-tile {
+			width: 40px;
+			height: 40px;
+			border-radius: var(--h-radius-sm);
+		}
+
+		.name {
+			font-size: var(--h-type-title);
+			letter-spacing: 0;
+		}
+
+		.chips {
+			gap: 8px;
+		}
+
+		.chip {
+			height: 40px;
+			padding: 0 12px;
+		}
+
+		.chip-value {
+			font-size: var(--h-type-emphasis);
+		}
+
+		.chip-label {
+			font-size: var(--h-type-caption);
+		}
 	}
 </style>

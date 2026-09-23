@@ -71,6 +71,12 @@
 		margin-bottom: 32px;
 	}
 
+	@media (max-width: 900px) {
+		.header-slot {
+			margin-bottom: 16px;
+		}
+	}
+
 	/* hidden headers stay visible in edit mode so the page remains editable */
 	.header-slot.hidden-header {
 		opacity: 0.45;

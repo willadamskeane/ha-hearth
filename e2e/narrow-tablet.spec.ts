@@ -25,3 +25,12 @@ test('?menu=false hides the strip toggle too', async ({ page }) => {
 	await expect(page.getByRole('button', { name: /Desk lamp/ })).toBeVisible();
 	await expect(page.getByRole('button', { name: 'Edit Hearth configuration' })).toHaveCount(0);
 });
+
+test('the room header drops to a compact size', async ({ page }) => {
+	await page.goto('/');
+	await expect(page.getByRole('button', { name: /Desk lamp/ })).toBeVisible();
+	const header = page.locator('.header-slot');
+	await expect(header.locator('.name')).toHaveCSS('font-size', '20px');
+	const box = (await header.boundingBox())!;
+	expect(box.height).toBeLessThanOrEqual(48);
+});
