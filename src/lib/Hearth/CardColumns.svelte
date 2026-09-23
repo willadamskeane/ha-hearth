@@ -50,6 +50,25 @@
 		return cloneOverviewItem(item, takenCardIds($hearthConfig));
 	}
 
+	// Open a page with only the cards a wall tablet can show above the fold,
+	// then build the rest once that frame is on screen: switching pages feels
+	// as fast as its first cards instead of its whole length. Edit mode always
+	// renders everything, since the editor targets every card.
+	const FIRST_CARDS_PER_COLUMN = 2;
+	let revealAll = $state(false);
+	$effect.pre(() => {
+		void roomId;
+		revealAll = false;
+		let timer: ReturnType<typeof setTimeout> | undefined;
+		const frame = requestAnimationFrame(() => {
+			timer = setTimeout(() => (revealAll = true));
+		});
+		return () => {
+			cancelAnimationFrame(frame);
+			clearTimeout(timer);
+		};
+	});
+
 	function reorderColumn(column: number, items: OverviewItem[]) {
 		updateConfig((config) => {
 			locate(config)[column] = items.filter(Boolean);
@@ -190,7 +209,9 @@
 				receiveCard(columnIndex, detail.id, detail.newIndex, detail.alt ?? false)}
 		>
 			{#each column as item, index (item.id)}
-				{#if isStack(item)}
+				{#if !revealAll && !$hearthEditMode && index >= FIRST_CARDS_PER_COLUMN}
+					<!-- built on the next frame -->
+				{:else if isStack(item)}
 					<div
 						class="stack-slot"
 						class:stretch={fillWeight(item) > 0}
