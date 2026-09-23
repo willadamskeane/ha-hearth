@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.11
+
+- Compact the room header on narrow screens. Where the rail folds away, the icon tile, title and temperature/humidity chips drop to a smaller size and sit closer to the cards, so a wall tablet spends less of its height on the room name the page strip already shows.
+
 ## 0.1.10
 
 - Move the edit toggle into the page strip on narrow screens. Below the 900px breakpoint the rail folds away, and the toggle it anchored at the bottom-left corner floated over the first column's tiles on a wall tablet. It is now a pencil button beside search; `?menu=false` still hides it.
