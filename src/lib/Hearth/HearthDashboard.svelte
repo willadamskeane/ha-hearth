@@ -139,7 +139,7 @@
 		class:rail-folds={railFolds && !$hearthEditMode}
 		use:scrollEdges={{ report: (edges) => (layoutCut = edges) }}
 	>
-		<StatusStrip />
+		<StatusStrip {hideEditToggle} />
 		<PhoneNav onsearch={() => (showSearch = true)} {hideEditToggle} />
 		<div class="rail-scroll">
 			<Rail onsearch={() => (showSearch = true)} />

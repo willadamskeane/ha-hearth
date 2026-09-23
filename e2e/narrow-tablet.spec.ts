@@ -6,21 +6,28 @@ import { expect, test } from '@playwright/test';
 
 test.use({ viewport: { width: 853, height: 533 }, hasTouch: true });
 
-test('the edit toggle sits in the page strip, not over page content', async ({ page }) => {
+test('the edit toggle sits at the end of the status strip, not over the page or the tabs', async ({
+	page
+}) => {
 	await page.goto('/');
 	await expect(page.getByRole('button', { name: /Desk lamp/ })).toBeVisible();
 
-	const strip = page.getByRole('navigation', { name: 'Pages' });
+	const status = page.getByRole('group', { name: 'Status' });
 	const toggles = page.getByRole('button', { name: 'Edit Hearth configuration' });
 	await expect(toggles).toHaveCount(1);
-	await expect(strip.getByRole('button', { name: 'Edit Hearth configuration' })).toBeInViewport();
+	await expect(status.getByRole('button', { name: 'Edit Hearth configuration' })).toBeInViewport();
+	await expect(
+		page
+			.getByRole('navigation', { name: 'Pages' })
+			.getByRole('button', { name: 'Edit Hearth configuration' })
+	).toHaveCount(0);
 
 	await toggles.click();
 	await expect(page.getByRole('button', { name: 'Save' })).toBeVisible();
 	await expect(toggles).toHaveCount(0);
 });
 
-test('?menu=false hides the strip toggle too', async ({ page }) => {
+test('?menu=false hides the edit toggle', async ({ page }) => {
 	await page.goto('/?menu=false');
 	await expect(page.getByRole('button', { name: /Desk lamp/ })).toBeVisible();
 	await expect(page.getByRole('button', { name: 'Edit Hearth configuration' })).toHaveCount(0);

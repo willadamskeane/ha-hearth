@@ -65,6 +65,11 @@ export function isStripWidget(widget: RailWidget): boolean {
 	return widgetDescriptor(widget.type)?.strip === true;
 }
 
+/** Whether the narrow-layout status strip renders at all for this rail. */
+export function hasStripWidgets(rail: RailWidget[]): boolean {
+	return rail.some((widget) => isStripWidget(widget) && !widget.hide_mobile);
+}
+
 export function railWidgetNeedsConfiguration(widget: RailWidget): boolean {
 	return widgetDescriptor(widget.type).needsConfiguration?.(widget) ?? false;
 }

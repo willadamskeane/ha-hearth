@@ -9,13 +9,15 @@
 		hearthLoadError
 	} from '../store';
 	import Icon from '../Icon.svelte';
+	import { hasStripWidgets } from '../widgets';
 
 	/**
 	 * Page switcher for narrow viewports, where the rail folds under the page
 	 * and its navigation widget would be a screen away. Sticky at the top of
 	 * the scroll container; hidden by CSS above the rail-folds breakpoint.
 	 * It also carries the edit toggle, whose floating home at the rail's foot
-	 * would sit over page content once the rail folds away.
+	 * would sit over page content once the rail folds away, unless the status
+	 * strip is there to take it.
 	 */
 	let { onsearch, hideEditToggle = false }: { onsearch: () => void; hideEditToggle?: boolean } =
 		$props();
@@ -45,7 +47,7 @@
 			<Icon name="search" size={ICON.control} />
 		</button>
 	{/if}
-	{#if !hideEditToggle && !$hearthLoadError && !$hearthEditMode}
+	{#if !hideEditToggle && !$hearthLoadError && !$hearthEditMode && !hasStripWidgets($hearthConfig.rail)}
 		<button
 			type="button"
 			class="edit pressable"
