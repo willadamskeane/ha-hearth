@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { WebSocketServer } from 'ws';
 
@@ -10,12 +11,32 @@ import { WebSocketServer } from 'ws';
  * draw. Test endpoints: GET /_test/calls lists received service calls,
  * POST /_test/reset restores the initial states and clears the call log,
  * POST /_test/state with { entity_id, state, attributes } patches one entity.
+ *
+ * Benchmarks (scripts/kiosk-bench) can swap in a real house: FAKE_HASS_STATES
+ * is a get_states JSON list to serve instead of the scripted entities,
+ * FAKE_HASS_REPLAY a list of { t, entity_id, state, attributes } changes (t in
+ * ms) replayed on a loop so the page carries real update traffic, and
+ * FAKE_HASS_HOST the address to bind (default 127.0.0.1).
  */
 
 const PORT = Number(process.env.FAKE_HASS_PORT ?? 8124);
+const HOST = process.env.FAKE_HASS_HOST ?? '127.0.0.1';
+const STATES_FILE = process.env.FAKE_HASS_STATES;
+const REPLAY_FILE = process.env.FAKE_HASS_REPLAY;
 const HA_VERSION = '2026.1.0';
 
 function initialStates() {
+	return STATES_FILE ? loadedStates() : scriptedStates();
+}
+
+function loadedStates() {
+	const list = JSON.parse(readFileSync(STATES_FILE, 'utf8'));
+	return Object.fromEntries(
+		list.map((entity) => [entity.entity_id, { s: entity.state, a: entity.attributes ?? {} }])
+	);
+}
+
+function scriptedStates() {
 	return {
 		'light.desk': {
 			s: 'off',
@@ -739,6 +760,22 @@ wss.on('connection', (socket) => {
 	socket.on('close', () => entitySubscribers.delete(socket));
 });
 
-http.listen(PORT, '127.0.0.1', () => {
-	console.log(`fake home assistant listening on http://127.0.0.1:${PORT}`);
+http.listen(PORT, HOST, () => {
+	console.log(`fake home assistant listening on http://${HOST}:${PORT}`);
+	if (REPLAY_FILE) startReplay(JSON.parse(readFileSync(REPLAY_FILE, 'utf8')));
 });
+
+function startReplay(changes) {
+	if (!changes.length) return;
+	const period = changes[changes.length - 1].t + 1000;
+	const round = () => {
+		for (const change of changes) {
+			setTimeout(() => {
+				states[change.entity_id] = { s: change.state, a: change.attributes ?? {} };
+				pushChange(change.entity_id);
+			}, change.t);
+		}
+		setTimeout(round, period);
+	};
+	round();
+}
