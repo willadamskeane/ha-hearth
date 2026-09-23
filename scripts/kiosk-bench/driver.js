@@ -21,6 +21,13 @@
 		await frame();
 		return performance.now();
 	};
+	// a task queued from the next frame runs once that frame has painted: when a
+	// page switch first shows anything, before any work deferred past it
+	const firstPaint = async () => {
+		await frame();
+		await new Promise((resolve) => setTimeout(resolve));
+		return performance.now();
+	};
 
 	try {
 		for (let i = 0; i < 240 && !document.querySelector('main .tile'); i++) await sleep(250);
@@ -134,17 +141,29 @@
 
 		await scenario('idle', () => sleep(config.idleMs ?? 10000));
 
-		await scenario('tabs', async () => {
+		// two passes over every page: each switch builds the page from scratch,
+		// so the second pass doubles the samples for a noisy measurement
+		const tabPass = async () => {
 			const switchMs = [];
+			const settledMs = [];
 			const list = tabs().slice(0, config.tabs ?? 14);
 			for (const tab of [...list.slice(1), list[0]]) {
 				const start = performance.now();
 				tab.click();
-				switchMs.push(Math.round((await painted()) - start));
+				switchMs.push(Math.round((await firstPaint()) - start));
+				settledMs.push(Math.round((await painted()) - start));
 				await sleep(1200);
 			}
-			return { switchMs, switchP50: quantile(switchMs, 0.5), switchMax: Math.max(...switchMs) };
-		});
+			return {
+				switchMs,
+				switchP50: quantile(switchMs, 0.5),
+				switchMax: Math.max(...switchMs),
+				settledP50: quantile(settledMs, 0.5),
+				settledMax: Math.max(...settledMs)
+			};
+		};
+		await scenario('tabs', tabPass);
+		await scenario('tabs-again', tabPass);
 
 		firstTab?.click();
 		await sleep(1500);

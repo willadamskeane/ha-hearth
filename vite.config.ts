@@ -6,6 +6,8 @@ dotenv.config({ quiet: true });
 
 export default defineConfig({
 	plugins: [sveltekit()],
+	// opt-in for profiling (scripts/kiosk-bench/profile.mjs); release builds ship none
+	build: { sourcemap: process.env.HEARTH_SOURCEMAP === 'true' },
 	optimizeDeps: {
 		include: [
 			// include all because of dynamic imports, prevents: ✨ optimized dependencies changed. reloading

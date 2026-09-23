@@ -15,14 +15,11 @@
  * results, then runs --close. `--set` overrides dashboard root keys for
  * experiments (JSON values, e.g. --set scroll_edge_blur=false).
  */
-import { spawn, execSync } from 'node:child_process';
+import { execSync } from 'node:child_process';
 import { createServer } from 'node:http';
-import { mkdtempSync, mkdirSync, readFileSync, symlinkSync, writeFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+import { readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { ROOT, startStack } from './stack.mjs';
 
 function parseArgs(argv) {
 	const args = { set: [], fakePort: 8130, appPort: 8131, resultsPort: 8132, timeout: 300 };
@@ -37,74 +34,21 @@ function parseArgs(argv) {
 	return args;
 }
 
-function waitFor(url, seconds) {
-	const deadline = Date.now() + seconds * 1000;
-	return (async () => {
-		while (Date.now() < deadline) {
-			try {
-				if ((await fetch(url)).status < 500) return;
-			} catch {
-				// not listening yet
-			}
-			await new Promise((r) => setTimeout(r, 250));
-		}
-		throw new Error(`${url} did not come up`);
-	})();
-}
-
 const args = parseArgs(process.argv.slice(2));
-const data = resolve(args.data);
-const children = [];
-const work = mkdtempSync(join(tmpdir(), 'kiosk-bench-'));
-
-function cleanup() {
-	for (const child of children) child.kill();
-	rmSync(work, { recursive: true, force: true });
-}
+const resultsUrl = `http://${args.host}:${args.resultsPort}/results`;
+const stack = await startStack({
+	data: args.data,
+	host: args.host,
+	fakePort: Number(args.fakePort),
+	appPort: Number(args.appPort),
+	overrides: args.set,
+	customJs:
+		`window.__KIOSK_BENCH__ = ${JSON.stringify({ results: resultsUrl })};\n` +
+		readFileSync(join(ROOT, 'scripts/kiosk-bench/driver.js'), 'utf8')
+});
+const closers = [];
 
 try {
-	// the dashboard, with experiment overrides; the overlay would skew timings
-	const hearth = JSON.parse(readFileSync(join(data, 'hearth.json'), 'utf8'));
-	delete hearth.perf_overlay;
-	for (const assignment of args.set) {
-		const [key, ...rest] = assignment.split('=');
-		hearth[key] = JSON.parse(rest.join('='));
-	}
-	mkdirSync(join(work, 'data'));
-	symlinkSync(join(ROOT, 'build'), join(work, 'build'));
-	writeFileSync(join(work, 'data/hearth.yaml'), JSON.stringify(hearth));
-	writeFileSync(join(work, 'data/configuration.yaml'), 'token: kiosk-bench\ncustom_js: true\n');
-	const resultsUrl = `http://${args.host}:${args.resultsPort}/results`;
-	writeFileSync(
-		join(work, 'data/custom_javascript.js'),
-		`window.__KIOSK_BENCH__ = ${JSON.stringify({ results: resultsUrl })};\n` +
-			readFileSync(join(ROOT, 'scripts/kiosk-bench/driver.js'), 'utf8')
-	);
-
-	children.push(
-		spawn('node', [join(ROOT, 'e2e/fake-hass.mjs')], {
-			stdio: 'ignore',
-			env: {
-				...process.env,
-				FAKE_HASS_PORT: String(args.fakePort),
-				FAKE_HASS_HOST: '0.0.0.0',
-				FAKE_HASS_STATES: join(data, 'states.json'),
-				FAKE_HASS_REPLAY: join(data, 'replay.json')
-			}
-		}),
-		spawn('node', [join(ROOT, 'server.js')], {
-			cwd: work,
-			stdio: 'ignore',
-			env: {
-				...process.env,
-				PORT: String(args.appPort),
-				HASS_URL: `http://127.0.0.1:${args.fakePort}`,
-				PUBLIC_HASS_URL: `http://${args.host}:${args.fakePort}`,
-				NODE_ENV: 'production'
-			}
-		})
-	);
-
 	const outcome = new Promise((resolveOutcome, reject) => {
 		const server = createServer((request, response) => {
 			response.setHeader('Access-Control-Allow-Origin', '*');
@@ -120,13 +64,11 @@ try {
 			});
 		});
 		server.listen(args.resultsPort, '0.0.0.0');
-		children.push({ kill: () => server.close() });
+		closers.push(() => server.close());
 		setTimeout(() => reject(new Error('timed out waiting for results')), args.timeout * 1000);
 	});
 
-	await waitFor(`http://127.0.0.1:${args.fakePort}/_test/calls`, 20);
-	await waitFor(`http://127.0.0.1:${args.appPort}/`, 30);
-	const url = `http://${args.host}:${args.appPort}/?room=${args.room ?? 'home'}&menu=false`;
+	const url = `${stack.appUrl}/?room=${args.room ?? 'home'}&menu=false`;
 	console.error(`opening ${url} on the device`);
 	execSync(args.open.replaceAll('{url}', url), { stdio: 'inherit' });
 	let results;
@@ -135,7 +77,7 @@ try {
 	} finally {
 		execSync(args.close, { stdio: 'inherit' });
 	}
-	const calls = await (await fetch(`http://127.0.0.1:${args.fakePort}/_test/calls`)).json();
+	const calls = await (await fetch(`${stack.fakeUrl}/_test/calls`)).json();
 	results.label = args.label ?? 'baseline';
 	results.overrides = args.set;
 	results.fakeServiceCalls = calls.length;
@@ -148,12 +90,11 @@ try {
 		max: s.frames.max,
 		'>50ms': s.frames.over50,
 		longTasks: `${s.longTasks.count} / ${s.longTasks.totalMs}ms`,
-		detail:
-			name === 'tabs'
-				? `switch p50 ${s.switchP50} max ${s.switchMax}`
-				: name === 'taps'
-					? `tap→frame p50 ${s.tapP50} max ${s.tapMax}`
-					: ''
+		detail: name.startsWith('tabs')
+			? `first paint p50 ${s.switchP50} max ${s.switchMax} · settled p50 ${s.settledP50} max ${s.settledMax}`
+			: name === 'taps'
+				? `tap→frame p50 ${s.tapP50} max ${s.tapMax}`
+				: ''
 	}));
 	console.log(
 		`\n${results.label} (${results.overrides.join(', ') || 'no overrides'}), lowPower=${results.lowPower}`
@@ -161,5 +102,6 @@ try {
 	console.table(rows);
 	console.log(`service calls answered by the fake Home Assistant: ${results.fakeServiceCalls}`);
 } finally {
-	cleanup();
+	for (const close of closers) close();
+	stack.stop();
 }
