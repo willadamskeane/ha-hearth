@@ -6,7 +6,10 @@
 	import type { SliderUpdateMode } from '$lib/core/app/configuration';
 	import { onDndReceive } from './drag';
 	import { hearthEditMode } from './store';
+	import { domainDescriptor } from '$lib/core/domains';
+	import BlindTile from './BlindTile.svelte';
 	import EntityTile from './EntityTile.svelte';
+	import LightTile from './LightTile.svelte';
 	import Icon from './Icon.svelte';
 	import StatTile from './StatTile.svelte';
 
@@ -73,7 +76,11 @@
 			{#if (ref.display ?? style) === 'stat'}
 				<StatTile entity={ref.entity} name={ref.name} verdictBands={ref.verdict} />
 			{:else}
-				<EntityTile
+				<!-- lights and covers go straight to their tile rather than through
+				     EntityTile's own dispatch: one component per tile, not two -->
+				{@const tile = domainDescriptor(ref.entity.split('.')[0]).tile}
+				{@const Tile = tile === 'light' ? LightTile : tile === 'cover' ? BlindTile : EntityTile}
+				<Tile
 					entity={ref.entity}
 					name={ref.name}
 					icon={ref.icon}
