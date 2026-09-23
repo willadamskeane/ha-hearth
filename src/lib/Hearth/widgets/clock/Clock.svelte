@@ -11,8 +11,15 @@
 	let {
 		timezone,
 		hour_format = 'auto',
-		show_seconds = false
-	}: { timezone?: string; hour_format?: ClockHourFormat; show_seconds?: boolean } = $props();
+		show_seconds = false,
+		compact = false
+	}: {
+		timezone?: string;
+		hour_format?: ClockHourFormat;
+		show_seconds?: boolean;
+		/** one line for the narrow-layout status strip: time and a short date */
+		compact?: boolean;
+	} = $props();
 
 	let now = $derived($timer);
 
@@ -31,6 +38,14 @@
 			...(activeTimezone ? { timeZone: activeTimezone } : {})
 		})
 	);
+	let shortDate = $derived(
+		now.toLocaleDateString($selectedLanguage, {
+			weekday: 'short',
+			month: 'short',
+			day: 'numeric',
+			...(activeTimezone ? { timeZone: activeTimezone } : {})
+		})
+	);
 	let hour = $derived(hourInTimeZone(now, $selectedLanguage, activeTimezone));
 	let greeting = $derived(
 		$lang(
@@ -43,13 +58,38 @@
 	);
 </script>
 
-<div>
-	<div class="clock">{time}</div>
-	<div class="date">{date}</div>
-	<div class="greeting">{greeting}</div>
-</div>
+{#if compact}
+	<div class="compact">
+		<span class="compact-time">{time}</span>
+		<span class="compact-date">{shortDate}</span>
+	</div>
+{:else}
+	<div>
+		<div class="clock">{time}</div>
+		<div class="date">{date}</div>
+		<div class="greeting">{greeting}</div>
+	</div>
+{/if}
 
 <style>
+	.compact {
+		display: flex;
+		align-items: baseline;
+		gap: 10px;
+		white-space: nowrap;
+	}
+
+	.compact-time {
+		font-size: var(--h-type-title);
+		font-weight: 600;
+		color: var(--h-text-1);
+	}
+
+	.compact-date {
+		font-size: var(--h-type-secondary);
+		color: var(--h-text-4);
+	}
+
 	.clock {
 		font-size: var(--h-type-clock);
 		font-weight: 600;

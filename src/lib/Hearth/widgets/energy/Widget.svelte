@@ -7,9 +7,13 @@
 	import { fetchStatistics, startDataRefresh } from '$lib/core/ha/history';
 	import { sensorNumber } from '$lib/core/ha/entities';
 	import Icon from '../../Icon.svelte';
+	import StripChip from '../StripChip.svelte';
 	import { kwhFactor } from './units';
 
-	let { widget }: { widget: Extract<RailWidget, { type: 'energy' }> } = $props();
+	let {
+		widget,
+		compact = false
+	}: { widget: Extract<RailWidget, { type: 'energy' }>; compact?: boolean } = $props();
 
 	let selectedEntity = $derived(entityState(widget.entity));
 
@@ -80,35 +84,43 @@
 	});
 </script>
 
-<div class="card">
-	<div class="header">
-		<Icon name="bolt" size={ICON.control} color="rgb(var(--h-accent-rgb))" fill />
-		<span class="title">{$lang('hearth_energy')}</span>
-		<span class="reading">
-			{#if total !== null}
-				<span class="value">{total.toFixed(1)} kWh</span>
-				{#if cost}
-					<span class="cost">· {cost}</span>
-				{/if}
-			{:else}
-				<span class="cost">-</span>
-			{/if}
-		</span>
-	</div>
-	{#if bars.length}
-		<div class="bars">
-			{#each bars as bar, index (index)}
-				<span
-					class="bar"
-					style:height="{bar.height}px"
-					style:background={bar.current
-						? 'rgb(var(--h-accent-rgb))'
-						: `rgb(var(--h-accent-rgb) / ${bar.alpha})`}
-				></span>
-			{/each}
-		</div>
+{#if compact}
+	{#if total !== null}
+		<StripChip icon="bolt" iconColor="rgb(var(--h-accent-rgb))" fill label={$lang('hearth_energy')}>
+			{total.toFixed(1)} kWh{cost ? ` · ${cost}` : ''}
+		</StripChip>
 	{/if}
-</div>
+{:else}
+	<div class="card">
+		<div class="header">
+			<Icon name="bolt" size={ICON.control} color="rgb(var(--h-accent-rgb))" fill />
+			<span class="title">{$lang('hearth_energy')}</span>
+			<span class="reading">
+				{#if total !== null}
+					<span class="value">{total.toFixed(1)} kWh</span>
+					{#if cost}
+						<span class="cost">· {cost}</span>
+					{/if}
+				{:else}
+					<span class="cost">-</span>
+				{/if}
+			</span>
+		</div>
+		{#if bars.length}
+			<div class="bars">
+				{#each bars as bar, index (index)}
+					<span
+						class="bar"
+						style:height="{bar.height}px"
+						style:background={bar.current
+							? 'rgb(var(--h-accent-rgb))'
+							: `rgb(var(--h-accent-rgb) / ${bar.alpha})`}
+					></span>
+				{/each}
+			</div>
+		{/if}
+	</div>
+{/if}
 
 <style>
 	.card {

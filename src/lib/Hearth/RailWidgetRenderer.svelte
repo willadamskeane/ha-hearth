@@ -8,7 +8,11 @@
 	} from './widgets';
 	import ConfigurationPlaceholder from './ConfigurationPlaceholder.svelte';
 
-	let { widget, onsearch = () => {} }: { widget: RailWidget; onsearch?: () => void } = $props();
+	let {
+		widget,
+		onsearch = () => {},
+		compact = false
+	}: { widget: RailWidget; onsearch?: () => void; compact?: boolean } = $props();
 
 	let descriptor = $derived(widgetDescriptor(widget.type));
 </script>
@@ -22,5 +26,5 @@
 {:else if railWidgetNeedsConfiguration(widget)}
 	<ConfigurationPlaceholder label={railConfigurationLabel(widget)} compact context="widget" />
 {:else if descriptor.component}
-	<descriptor.component {widget} {onsearch} />
+	<descriptor.component {widget} {onsearch} {compact} />
 {/if}

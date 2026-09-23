@@ -60,6 +60,11 @@ export function widgetDescriptor(type: string) {
 	return BY_TYPE.get(type);
 }
 
+/** Whether the widget moves into the narrow-layout status strip. */
+export function isStripWidget(widget: RailWidget): boolean {
+	return widgetDescriptor(widget.type)?.strip === true;
+}
+
 export function railWidgetNeedsConfiguration(widget: RailWidget): boolean {
 	return widgetDescriptor(widget.type).needsConfiguration?.(widget) ?? false;
 }

@@ -19,6 +19,8 @@
 	import EditBar from './shell/EditBar.svelte';
 	import Keyboard from './shell/Keyboard.svelte';
 	import PhoneNav from './shell/PhoneNav.svelte';
+	import StatusStrip from './shell/StatusStrip.svelte';
+	import { isStripWidget } from './widgets';
 	import ThemeStyle from './shell/ThemeStyle.svelte';
 	import Toasts from './shell/Toasts.svelte';
 	import { wakeLock } from './wakeLock';
@@ -89,6 +91,16 @@
 	// stays reachable if already active, it just can't be entered from here
 	let hideEditToggle = $state(false);
 
+	// where the rail folds away, its navigation moves to PhoneNav and its
+	// glanceable widgets to StatusStrip; if nothing else is left, the folded
+	// rail below the page is empty chrome
+	const FOLDED_STRUCTURE = new Set(['label', 'spacer', 'nav']);
+	let railFolds = $derived(
+		$hearthConfig.rail.every(
+			(widget) => widget.hide_mobile || isStripWidget(widget) || FOLDED_STRUCTURE.has(widget.type)
+		)
+	);
+
 	onMount(() => {
 		const params = new URLSearchParams(location.search);
 		if ($hearthNeedsSetup && !$hearthLoadError) showSetupWizard = true;
@@ -124,8 +136,10 @@
 	<div
 		class="layout"
 		class:editing={$hearthEditMode}
+		class:rail-folds={railFolds && !$hearthEditMode}
 		use:scrollEdges={{ report: (edges) => (layoutCut = edges) }}
 	>
+		<StatusStrip />
 		<PhoneNav onsearch={() => (showSearch = true)} {hideEditToggle} />
 		<div class="rail-scroll">
 			<Rail onsearch={() => (showSearch = true)} />
@@ -321,6 +335,8 @@
 				calc(var(--h-pad-y) + env(safe-area-inset-bottom));
 			gap: 24px;
 			overflow-y: auto;
+			/* a short page must not stretch the strip and tab rows to fill the screen */
+			align-content: start;
 		}
 
 		/* the edit bar floats over the scroll container; leave room under the
@@ -345,6 +361,10 @@
 
 		.rail-scroll {
 			padding-bottom: 80px; /* literal ok: toggle height plus margin */
+		}
+
+		.layout.rail-folds .rail-scroll {
+			display: none;
 		}
 
 		/* On short wall tablets the active page is the primary glance surface;

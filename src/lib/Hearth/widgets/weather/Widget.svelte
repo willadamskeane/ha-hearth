@@ -5,10 +5,11 @@
 	import { lang, selectedLanguage } from '$lib/core/i18n';
 	import { entityState } from '$lib/core/ha/entities';
 	import Icon from '../../Icon.svelte';
+	import StripChip from '../StripChip.svelte';
 
 	import type { WeatherWidget } from './descriptor';
 
-	let { widget }: { widget: WeatherWidget } = $props();
+	let { widget, compact = false }: { widget: WeatherWidget; compact?: boolean } = $props();
 	let weatherEntity = $derived(widget.entity);
 
 	const conditionIcons: Record<string, string> = {
@@ -77,32 +78,45 @@
 	});
 </script>
 
-<div class="card">
-	<div class="row">
-		<Icon
-			name={conditionIcons[condition] ?? 'clear_day'}
-			size={ICON.control}
-			color="rgb(var(--h-accent-rgb))"
-			fill
-		/>
-		<div class="current">
-			<div class="temp">
-				{typeof temperature === 'number'
-					? Intl.NumberFormat($selectedLanguage).format(Math.round(temperature))
-					: '-'}°
-			</div>
-			<div class="sub">{sub}</div>
-		</div>
-		<div class="forecast">
-			{#each forecast as day (day.day)}
-				<div>
-					<div class="day">{day.day}</div>
-					<div class="value">{day.temp}</div>
+{#if compact}
+	<StripChip
+		icon={conditionIcons[condition] ?? 'clear_day'}
+		iconColor="rgb(var(--h-accent-rgb))"
+		fill
+		label={sub}
+	>
+		{typeof temperature === 'number'
+			? Intl.NumberFormat($selectedLanguage).format(Math.round(temperature))
+			: '-'}°
+	</StripChip>
+{:else}
+	<div class="card">
+		<div class="row">
+			<Icon
+				name={conditionIcons[condition] ?? 'clear_day'}
+				size={ICON.control}
+				color="rgb(var(--h-accent-rgb))"
+				fill
+			/>
+			<div class="current">
+				<div class="temp">
+					{typeof temperature === 'number'
+						? Intl.NumberFormat($selectedLanguage).format(Math.round(temperature))
+						: '-'}°
 				</div>
-			{/each}
+				<div class="sub">{sub}</div>
+			</div>
+			<div class="forecast">
+				{#each forecast as day (day.day)}
+					<div>
+						<div class="day">{day.day}</div>
+						<div class="value">{day.temp}</div>
+					</div>
+				{/each}
+			</div>
 		</div>
 	</div>
-</div>
+{/if}
 
 <style>
 	.card {

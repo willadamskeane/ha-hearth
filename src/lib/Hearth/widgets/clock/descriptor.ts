@@ -6,5 +6,6 @@ export type { ClockWidget } from '../../model/widgets/clock';
 export const clockWidget: WidgetDescriptor<ClockWidget> = {
 	...definition,
 	component: Widget,
+	strip: true,
 	editor: () => import('./Editor.svelte')
 };

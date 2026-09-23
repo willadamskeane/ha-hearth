@@ -6,5 +6,6 @@ export type { ProgressWidget } from '../../model/widgets/progress';
 export const progressWidget: WidgetDescriptor<ProgressWidget> = {
 	...definition,
 	component: Widget,
+	strip: true,
 	editor: () => import('./Editor.svelte')
 };

@@ -8,8 +8,12 @@
 	import { hearthEditMode } from '../../store';
 	import { sensorNumber } from '$lib/core/ha/entities';
 	import Icon from '../../Icon.svelte';
+	import StripChip from '../StripChip.svelte';
 
-	let { widget }: { widget: Extract<RailWidget, { type: 'progress' }> } = $props();
+	let {
+		widget,
+		compact = false
+	}: { widget: Extract<RailWidget, { type: 'progress' }>; compact?: boolean } = $props();
 
 	// states that read as "nothing running" when no active_states list is set
 	const IDLE_STATES = ['idle', 'off', 'unavailable', 'unknown', 'standby', 'none', 'docked'];
@@ -116,35 +120,52 @@
 	});
 </script>
 
-{#if active || completionVisible || $hearthEditMode}
-	<svelte:element
-		this={completed && !$hearthEditMode ? 'button' : 'div'}
-		class="row"
-		class:inactive={!active && !completed}
-		class:completed
-		type={completed && !$hearthEditMode ? 'button' : undefined}
-		role={completed && !$hearthEditMode ? undefined : 'status'}
-		title={completed && !$hearthEditMode ? $lang('hearth_tap_to_dismiss') : undefined}
-		onclick={completed && !$hearthEditMode ? dismissCompletion : undefined}
-	>
-		<Icon name={widget.icon || 'autorenew'} size={ICON.control} color="var(--h-cool-icon)" />
-		<div class="body">
-			<div class="text">
-				{widget.name || 'Activity'}{status !== undefined ? ` · ${capitalize(status)}` : ''}
-			</div>
-			{#if progress !== null}
-				<div class="track">
-					<div class="fill" style:width="{progress}%"></div>
+{#if compact}
+	{#if active || completionVisible}
+		<StripChip
+			icon={widget.icon || 'autorenew'}
+			iconColor="var(--h-cool-icon)"
+			label={completed ? $lang('hearth_tap_to_dismiss') : undefined}
+			onclick={completed ? dismissCompletion : undefined}
+		>
+			{widget.name || 'Activity'}{[progressLabel, remaining].filter(Boolean).length
+				? ` · ${[progressLabel, remaining].filter(Boolean).join(' · ')}`
+				: status !== undefined
+					? ` · ${capitalize(status)}`
+					: ''}
+		</StripChip>
+	{/if}
+{:else}
+	{#if active || completionVisible || $hearthEditMode}
+		<svelte:element
+			this={completed && !$hearthEditMode ? 'button' : 'div'}
+			class="row"
+			class:inactive={!active && !completed}
+			class:completed
+			type={completed && !$hearthEditMode ? 'button' : undefined}
+			role={completed && !$hearthEditMode ? undefined : 'status'}
+			title={completed && !$hearthEditMode ? $lang('hearth_tap_to_dismiss') : undefined}
+			onclick={completed && !$hearthEditMode ? dismissCompletion : undefined}
+		>
+			<Icon name={widget.icon || 'autorenew'} size={ICON.control} color="var(--h-cool-icon)" />
+			<div class="body">
+				<div class="text">
+					{widget.name || 'Activity'}{status !== undefined ? ` · ${capitalize(status)}` : ''}
 				</div>
+				{#if progress !== null}
+					<div class="track">
+						<div class="fill" style:width="{progress}%"></div>
+					</div>
+				{/if}
+			</div>
+			{#if progressLabel !== null || remaining !== null}
+				<span class="remaining">{[progressLabel, remaining].filter(Boolean).join(' · ')}</span>
 			{/if}
-		</div>
-		{#if progressLabel !== null || remaining !== null}
-			<span class="remaining">{[progressLabel, remaining].filter(Boolean).join(' · ')}</span>
-		{/if}
-		{#if completed && !$hearthEditMode}
-			<span class="dismiss" aria-hidden="true">×</span>
-		{/if}
-	</svelte:element>
+			{#if completed && !$hearthEditMode}
+				<span class="dismiss" aria-hidden="true">×</span>
+			{/if}
+		</svelte:element>
+	{/if}
 {/if}
 
 <style>

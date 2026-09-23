@@ -6,5 +6,6 @@ export type { WeatherWidget } from '../../model/widgets/weather';
 export const weatherWidget: WidgetDescriptor<WeatherWidget> = {
 	...definition,
 	component: Widget,
+	strip: true,
 	editor: () => import('./Editor.svelte')
 };

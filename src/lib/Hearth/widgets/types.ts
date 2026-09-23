@@ -23,6 +23,8 @@ export interface WidgetComponentProps<T extends RailWidget> {
 	widget: T;
 	/** Opens the search overlay; only the search widget uses it. */
 	onsearch?: () => void;
+	/** Render as a one-line chip in the narrow-layout status strip; only `strip` widgets see it. */
+	compact?: boolean;
 }
 
 /**
@@ -31,6 +33,11 @@ export interface WidgetComponentProps<T extends RailWidget> {
  */
 export interface WidgetDescriptor<T extends RailWidget = RailWidget> extends WidgetDefinition<T> {
 	component: Component<WidgetComponentProps<T>>;
+	/**
+	 * Shown as a compact chip in the status strip where the rail folds away
+	 * (the PhoneNav breakpoint) instead of below the page.
+	 */
+	strip?: boolean;
 	/** Absent for widgets with no options. */
 	editor?: () => Promise<{ default: Component<WidgetEditorProps<T>> }>;
 }

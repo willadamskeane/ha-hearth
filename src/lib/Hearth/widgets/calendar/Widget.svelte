@@ -13,8 +13,12 @@
 	import { sensorNumber } from '$lib/core/ha/entities';
 	import { openEntityDetail } from '$lib/Hearth/details';
 	import Icon from '../../Icon.svelte';
+	import StripChip from '../StripChip.svelte';
 
-	let { widget }: { widget: Extract<RailWidget, { type: 'calendar' }> } = $props();
+	let {
+		widget,
+		compact = false
+	}: { widget: Extract<RailWidget, { type: 'calendar' }>; compact?: boolean } = $props();
 
 	interface NextEvent {
 		title: string;
@@ -108,25 +112,33 @@
 	}
 </script>
 
-{#if next || $hearthEditMode}
-	<div class="row" class:inactive={!next}>
-		<Icon name="event" size={ICON.control} color="var(--h-icon)" />
-		<div class="body">
-			<div class="title">{next?.title ?? $lang('hearth_no_upcoming_events')}</div>
-			{#if timeLine}
-				<div class="time">{timeLine}</div>
-			{/if}
+{#if compact}
+	{#if next}
+		<StripChip icon="event" label={$lang('calendar')} onclick={openCalendar}>
+			{next.title}{timeLine ? ` · ${timeLine}` : ''}
+		</StripChip>
+	{/if}
+{:else}
+	{#if next || $hearthEditMode}
+		<div class="row" class:inactive={!next}>
+			<Icon name="event" size={ICON.control} color="var(--h-icon)" />
+			<div class="body">
+				<div class="title">{next?.title ?? $lang('hearth_no_upcoming_events')}</div>
+				{#if timeLine}
+					<div class="time">{timeLine}</div>
+				{/if}
+			</div>
+			<button
+				type="button"
+				class="chevron pressable"
+				aria-label={$lang('calendar')}
+				use:Ripple={PRESS_RIPPLE}
+				onclick={openCalendar}
+			>
+				<Icon name="chevron_right" size={ICON.control} color="var(--h-icon)" />
+			</button>
 		</div>
-		<button
-			type="button"
-			class="chevron pressable"
-			aria-label={$lang('calendar')}
-			use:Ripple={PRESS_RIPPLE}
-			onclick={openCalendar}
-		>
-			<Icon name="chevron_right" size={ICON.control} color="var(--h-icon)" />
-		</button>
-	</div>
+	{/if}
 {/if}
 
 <style>

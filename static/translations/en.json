@@ -150,6 +150,7 @@
 	"hearth_not_connected": "Not connected to Home Assistant",
 	"hearth_no_upcoming_events": "No upcoming events",
 	"hearth_pages": "Pages",
+	"hearth_status": "Status",
 	"hearth_redo": "Redo",
 	"hearth_reload": "Reload",
 	"hearth_retry": "Retry",

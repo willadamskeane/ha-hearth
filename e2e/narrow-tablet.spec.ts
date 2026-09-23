@@ -34,3 +34,24 @@ test('the room header drops to a compact size', async ({ page }) => {
 	const box = (await header.boundingBox())!;
 	expect(box.height).toBeLessThanOrEqual(48);
 });
+
+test('the rail clock moves into a status strip above the page', async ({ page }) => {
+	await page.goto('/');
+	await expect(page.getByRole('button', { name: /Desk lamp/ })).toBeVisible();
+	const strip = page.getByRole('group', { name: 'Status' });
+	await expect(strip).toBeInViewport();
+	await expect(strip.locator('.compact-time')).toHaveText(/\d/);
+	// the rail held only the clock and nav, so nothing is left to fold below the page
+	await expect(page.locator('.rail-scroll')).toBeHidden();
+	const stripBox = (await strip.boundingBox())!;
+	const navBox = (await page.getByRole('navigation', { name: 'Pages' }).boundingBox())!;
+	expect(stripBox.y).toBeLessThan(navBox.y);
+});
+
+test('wide screens keep the rail and no strip', async ({ page }) => {
+	await page.setViewportSize({ width: 1280, height: 800 });
+	await page.goto('/');
+	await expect(page.getByRole('button', { name: /Desk lamp/ })).toBeVisible();
+	await expect(page.getByRole('group', { name: 'Status' })).toBeHidden();
+	await expect(page.locator('.rail .clock')).toBeVisible();
+});

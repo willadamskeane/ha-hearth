@@ -6,5 +6,6 @@ export type { EnergyWidget } from '../../model/widgets/energy';
 export const energyWidget: WidgetDescriptor<EnergyWidget> = {
 	...definition,
 	component: Widget,
+	strip: true,
 	editor: () => import('./Editor.svelte')
 };

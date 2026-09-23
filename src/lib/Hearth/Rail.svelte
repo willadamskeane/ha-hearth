@@ -7,6 +7,7 @@
 	import EditChip from './EditChip.svelte';
 	import RailWidgetRenderer from './RailWidgetRenderer.svelte';
 	import VisibilityGate from './VisibilityGate.svelte';
+	import { isStripWidget } from './widgets';
 
 	let { onsearch }: { onsearch: () => void } = $props();
 </script>
@@ -46,6 +47,7 @@
 						class:hide-mobile-editing={widget.hide_mobile && $hearthEditMode}
 						class:visibility-dimmed={$hearthEditMode && !visible}
 						class:nav={widget.type === 'nav' && !$hearthEditMode}
+						class:in-strip={isStripWidget(widget) && !$hearthEditMode}
 						data-id={widget.id}
 					>
 						{#if $hearthEditMode}
@@ -102,6 +104,11 @@
 		}
 
 		.widget.hide-mobile {
+			display: none;
+		}
+
+		/* StatusStrip shows these above the page */
+		.widget.in-strip {
 			display: none;
 		}
 
