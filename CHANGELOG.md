@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.19
+
+- The camera card can show several cameras (`entities: [...]`) as a two-column grid of snapshots. Each is named, and tapping one opens its live view. A single camera works as before.
+
 ## 0.1.18
 
 - Stop scrolling from toggling lights: tiles act on a real tap only, meaning one that stays within 10px either way and that the browser doesn't treat as a scroll. A touch that lands while the page is scrolling, or within 300ms of it, presses nothing, and touch ripples wait a moment so tiles don't flash under a passing finger. Mouse and keyboard work as before.
