@@ -298,6 +298,7 @@ export function normalizeHearthConfig(raw: unknown): HearthConfig {
 		'screensaver_brightness',
 		'keep_screen_on',
 		'scroll_edge_blur',
+		'perf_overlay',
 		'padding_x',
 		'padding_y'
 	]) {
@@ -321,6 +322,7 @@ export function normalizeHearthConfig(raw: unknown): HearthConfig {
 		keep_screen_on: typeof config.keep_screen_on === 'boolean' ? config.keep_screen_on : undefined,
 		scroll_edge_blur:
 			typeof config.scroll_edge_blur === 'boolean' ? config.scroll_edge_blur : undefined,
+		perf_overlay: config.perf_overlay === true ? true : undefined,
 		padding_x: normalizeWholeNumber(config.padding_x, 0),
 		padding_y: normalizeWholeNumber(config.padding_y, 0)
 	};

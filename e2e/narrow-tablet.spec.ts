@@ -62,3 +62,14 @@ test('wide screens keep the rail and no strip', async ({ page }) => {
 	await expect(page.getByRole('group', { name: 'Status' })).toBeHidden();
 	await expect(page.locator('.rail .clock')).toBeVisible();
 });
+
+test('?perf=1 shows the diagnostics overlay; it is off by default', async ({ page }) => {
+	await page.goto('/');
+	await expect(page.getByRole('button', { name: /Desk lamp/ })).toBeVisible();
+	await expect(page.locator('.perf-hud')).toHaveCount(0);
+
+	await page.goto('/?perf=1');
+	await expect(page.locator('.perf-hud')).toContainText(/fps \d+/);
+	await page.getByRole('button', { name: /Desk lamp/ }).click();
+	await expect(page.locator('.perf-hud')).toContainText(/taps \d+/, { timeout: 5000 });
+});

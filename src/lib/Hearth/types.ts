@@ -275,6 +275,8 @@ export interface HearthConfig {
 	// progressive blur where a scroll container cuts content off; costs a
 	// backdrop pass per layer, so weak tablets can turn it off
 	scroll_edge_blur?: boolean;
+	// diagnostic overlay with frame, long-task and tap timings (also ?perf=1)
+	perf_overlay?: boolean;
 	// extra edge padding in px, for kiosks whose frame covers screen edges
 	padding_x?: number;
 	padding_y?: number;

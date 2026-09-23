@@ -202,6 +202,7 @@ export const RootSettingsSchema = v.looseObject({
 	),
 	keep_screen_on: OptionalFlag,
 	scroll_edge_blur: OptionalFlag,
+	perf_overlay: OptionalFlag,
 	padding_x: optionalNumberAtLeast(0),
 	padding_y: optionalNumberAtLeast(0)
 });

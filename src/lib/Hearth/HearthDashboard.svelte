@@ -90,6 +90,8 @@
 	// ?menu=false hides the edit-toggle pencil for kiosk frames; edit mode
 	// stays reachable if already active, it just can't be entered from here
 	let hideEditToggle = $state(false);
+	let perfParam = $state(false);
+	let perfOverlay = $derived(perfParam || $hearthConfig.perf_overlay === true);
 
 	// where the rail folds away, its navigation moves to PhoneNav and its
 	// glanceable widgets to StatusStrip; if nothing else is left, the folded
@@ -114,6 +116,7 @@
 		}
 
 		hideEditToggle = params.get('menu') === 'false';
+		perfParam = params.get('perf') === '1';
 	});
 
 	// the override would mask theme edits, so drop it while editing
@@ -189,6 +192,12 @@
 	<ConfirmDialog />
 	<Toasts {overflowBy} />
 	<EditBar {hideEditToggle} onsetup={() => (showSetupWizard = true)} />
+	{#if perfOverlay}
+		<!-- diagnostics load only when asked for -->
+		{#await import('./shell/PerfHud.svelte') then PerfHud}
+			<PerfHud.default />
+		{/await}
+	{/if}
 </section>
 
 <style>
