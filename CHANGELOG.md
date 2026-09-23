@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.17
+
+- Subscribe only to the entities a dashboard shows instead of every entity in the house, widening to everything while editing, searching or setting up. On a large house this removes most idle script work and makes page loads lighter.
+- Build light and cover tiles directly, skip the visibility gate for cards without conditions, and cache number and calendar-time formatters: cheaper page switches on slow tablets.
+
 ## 0.1.16
 
 - Open pages faster on slow tablets: columns build their first two cards before the first frame and the rest right after, SortableJS is only set up while editing, and date/time formatters are cached instead of rebuilt every second. On the ThinkSmart View benchmark, long tasks while switching pages drop by about half.
