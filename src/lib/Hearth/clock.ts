@@ -1,3 +1,5 @@
+import { dateTimeFormat } from '$lib/core/i18n/time';
+
 export type ClockHourFormat = 'auto' | '12' | '24';
 
 /** Returns an IANA time-zone name only when Intl can actually format it. */
@@ -27,7 +29,7 @@ export function clockTimeOptions(
 }
 
 export function hourInTimeZone(date: Date, locale: string, timeZone?: string): number {
-	const part = new Intl.DateTimeFormat(locale, {
+	const part = dateTimeFormat(locale, {
 		hour: 'numeric',
 		hourCycle: 'h23',
 		...(timeZone ? { timeZone } : {})

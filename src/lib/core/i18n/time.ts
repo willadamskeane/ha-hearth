@@ -4,6 +4,37 @@ export function isTimestamp(state: string): boolean {
 	return format.test(state) && !isNaN(new Date(state).getTime());
 }
 
+/*
+ * Intl formatters are expensive to build and the clock, scene tiles and
+ * relative times format every second; build each distinct one once.
+ */
+const dateTimeFormats = new Map<string, Intl.DateTimeFormat>();
+const relativeTimeFormats = new Map<string, Intl.RelativeTimeFormat>();
+
+/** A cached `Intl.DateTimeFormat`; `format` matches `toLocale*String` with the same options. */
+export function dateTimeFormat(
+	locale: string | undefined,
+	options: Intl.DateTimeFormatOptions
+): Intl.DateTimeFormat {
+	const key = `${locale ?? ''}|${JSON.stringify(options)}`;
+	let format = dateTimeFormats.get(key);
+	if (!format) {
+		format = new Intl.DateTimeFormat(locale, options);
+		dateTimeFormats.set(key, format);
+	}
+	return format;
+}
+
+function relativeTimeFormat(locale: string | undefined): Intl.RelativeTimeFormat {
+	const key = locale ?? '';
+	let format = relativeTimeFormats.get(key);
+	if (!format) {
+		format = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' });
+		relativeTimeFormats.set(key, format);
+	}
+	return format;
+}
+
 const UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
 	['second', 60],
 	['minute', 60],
@@ -20,7 +51,7 @@ export function relativeTime(timestamp: string, languageCode: string | undefined
 		console.error(`Invalid timestamp: ${timestamp}`);
 		return timestamp;
 	}
-	const formatter = new Intl.RelativeTimeFormat(languageCode, { numeric: 'auto' });
+	const formatter = relativeTimeFormat(languageCode);
 	const diff = (date.getTime() - Date.now()) / 1000;
 	let magnitude = Math.abs(diff);
 	let index = 0;
@@ -52,7 +83,7 @@ export function parseLocalDate(value: string): Date {
 /** The calendar date of `date` as YYYY-MM-DD in `timeZone`, or the browser zone. */
 export function dateKey(date: Date, timeZone?: string): string {
 	// en-CA formats as YYYY-MM-DD
-	return new Intl.DateTimeFormat('en-CA', {
+	return dateTimeFormat('en-CA', {
 		year: 'numeric',
 		month: '2-digit',
 		day: '2-digit',

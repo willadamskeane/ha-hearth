@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calendarDaysBetween, dateKey, isTimestamp, parseLocalDate } from './time';
+import { calendarDaysBetween, dateKey, dateTimeFormat, isTimestamp, parseLocalDate } from './time';
 
 describe('parseLocalDate', () => {
 	it('reads a date-only value as local midnight', () => {
@@ -47,5 +47,16 @@ describe('isTimestamp', () => {
 	it('accepts anchored ISO timestamps only', () => {
 		expect(isTimestamp('2026-03-29T10:30:00+02:00')).toBe(true);
 		expect(isTimestamp('2026-03-29')).toBe(false);
+	});
+});
+
+describe('dateTimeFormat', () => {
+	it('reuses one formatter per locale and option set, matching toLocaleTimeString', () => {
+		const options = { hour: '2-digit', minute: '2-digit' } as const;
+		const first = dateTimeFormat('en-US', options);
+		expect(dateTimeFormat('en-US', { hour: '2-digit', minute: '2-digit' })).toBe(first);
+		expect(dateTimeFormat('de-DE', options)).not.toBe(first);
+		const when = new Date(2026, 8, 22, 21, 7);
+		expect(first.format(when)).toBe(when.toLocaleTimeString('en-US', options));
 	});
 });

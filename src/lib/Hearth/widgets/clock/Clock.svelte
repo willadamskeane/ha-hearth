@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { timer } from '$lib/core/app/clock';
 	import { lang, selectedLanguage } from '$lib/core/i18n';
+	import { dateTimeFormat } from '$lib/core/i18n/time';
 	import {
 		clockTimeOptions,
 		hourInTimeZone,
@@ -24,28 +25,29 @@
 	let now = $derived($timer);
 
 	let activeTimezone = $derived(validTimeZone(timezone));
-	let time = $derived(
-		now.toLocaleTimeString(
-			$selectedLanguage,
-			clockTimeOptions(activeTimezone, hour_format, show_seconds)
-		)
+	// the formatters are cached per option set; only .format runs every tick
+	let timeFormat = $derived(
+		dateTimeFormat($selectedLanguage, clockTimeOptions(activeTimezone, hour_format, show_seconds))
 	);
-	let date = $derived(
-		now.toLocaleDateString($selectedLanguage, {
+	let dateFormat = $derived(
+		dateTimeFormat($selectedLanguage, {
 			weekday: 'long',
 			month: 'long',
 			day: 'numeric',
 			...(activeTimezone ? { timeZone: activeTimezone } : {})
 		})
 	);
-	let shortDate = $derived(
-		now.toLocaleDateString($selectedLanguage, {
+	let shortDateFormat = $derived(
+		dateTimeFormat($selectedLanguage, {
 			weekday: 'short',
 			month: 'short',
 			day: 'numeric',
 			...(activeTimezone ? { timeZone: activeTimezone } : {})
 		})
 	);
+	let time = $derived(timeFormat.format(now));
+	let date = $derived(dateFormat.format(now));
+	let shortDate = $derived(shortDateFormat.format(now));
 	let hour = $derived(hourInTimeZone(now, $selectedLanguage, activeTimezone));
 	let greeting = $derived(
 		$lang(
