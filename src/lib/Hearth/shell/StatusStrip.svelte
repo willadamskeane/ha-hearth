@@ -42,9 +42,10 @@
 			gap: 8px;
 			min-width: 0;
 			/* one line: chips that do not fit are clipped rather than wrapping
-			   the page down or scrolling it sideways */
-			overflow: hidden;
-			padding: 4px 2px 0;
+			   the page down or scrolling it sideways; clip only sideways so the
+			   clock's glyphs and the chip borders are never cut vertically */
+			overflow-x: clip;
+			padding: 8px 2px 0;
 			/* the layout's row gap separates page sections; the strip belongs
 			   with the page tabs right under it, 8px away */
 			margin-bottom: -16px;
