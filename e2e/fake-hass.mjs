@@ -303,15 +303,17 @@ function scriptedStates() {
 
 let states = initialStates();
 let calls = [];
+// socket -> Map<subscription id, entity id filter (null: every entity)>
 const entitySubscribers = new Map();
 
 function now() {
 	return Math.floor(Date.now() / 1000);
 }
 
-function snapshot() {
+function snapshot(filter = null) {
 	const added = {};
 	for (const [entityId, entity] of Object.entries(states)) {
+		if (filter && !filter.has(entityId)) continue;
 		added[entityId] = { s: entity.s, a: entity.a, c: 'ctx', lc: now() };
 	}
 	return { a: added };
@@ -320,8 +322,10 @@ function snapshot() {
 function pushChange(entityId) {
 	const entity = states[entityId];
 	const change = { c: { [entityId]: { '+': { s: entity.s, a: entity.a, lc: now() } } } };
-	for (const [socket, id] of entitySubscribers) {
-		if (socket.readyState === socket.OPEN) {
+	for (const [socket, subscriptions] of entitySubscribers) {
+		if (socket.readyState !== socket.OPEN) continue;
+		for (const [id, filter] of subscriptions) {
+			if (filter && !filter.has(entityId)) continue;
 			socket.send(JSON.stringify({ id, type: 'event', event: change }));
 		}
 	}
@@ -582,10 +586,17 @@ function handleMessage(socket, message) {
 	const event = (payload) =>
 		socket.send(JSON.stringify({ id: message.id, type: 'event', event: payload }));
 	switch (message.type) {
-		case 'subscribe_entities':
-			entitySubscribers.set(socket, message.id);
+		case 'subscribe_entities': {
+			const filter = Array.isArray(message.entity_ids) ? new Set(message.entity_ids) : null;
+			if (!entitySubscribers.has(socket)) entitySubscribers.set(socket, new Map());
+			entitySubscribers.get(socket).set(message.id, filter);
 			reply(null);
-			event(snapshot());
+			event(snapshot(filter));
+			return;
+		}
+		case 'unsubscribe_events':
+			entitySubscribers.get(socket)?.delete(message.subscription);
+			reply(null);
 			return;
 		case 'get_config':
 			reply({

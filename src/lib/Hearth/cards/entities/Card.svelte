@@ -2,7 +2,7 @@
 	import { ICON } from '../../iconSizes';
 	import { lang } from '$lib/core/i18n';
 	import Ripple from '$lib/ui/actions/ripple';
-	import { entityIds, entityStates } from '$lib/core/ha/entities';
+	import { allEntityIds, entityIds, entityStates } from '$lib/core/ha/entities';
 	import {
 		findOverviewCard,
 		PRESS_RIPPLE,
@@ -35,7 +35,12 @@
 	const preview = getHearthInteractionMode() === 'preview';
 	let resolvedEntities = $derived.by(() => {
 		const explicitIds = new Set(card.entities.map((ref) => ref.entity));
-		const matched = wildcardEntityIds(card.wildcard, $entityIds)
+		// a scoped subscription holds only the dashboard's entities; match wildcards
+		// against the whole house
+		const matched = wildcardEntityIds(
+			card.wildcard,
+			$allEntityIds.length ? $allEntityIds : $entityIds
+		)
 			.filter((entityId) => !explicitIds.has(entityId))
 			.map((entityId): EntityRef => ({ entity: entityId }));
 		return [...card.entities, ...matched];

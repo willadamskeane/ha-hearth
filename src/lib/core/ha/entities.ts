@@ -1,4 +1,4 @@
-import { writable, type Readable, type Subscriber, type Writable } from 'svelte/store';
+import { get, writable, type Readable, type Subscriber, type Writable } from 'svelte/store';
 import type { HassEntities, HassEntity } from 'home-assistant-js-websocket';
 import { domainDescriptor } from '../domains';
 
@@ -289,8 +289,24 @@ export function entityGroupSummary(
 	};
 }
 
-/** Every known entity id; ordinary state changes do not republish this list. */
+/** Every entity id currently in the state table; ordinary state changes do not republish it. */
 export const entityIds: Readable<string[]> = { subscribe: backingEntityIds.subscribe };
+
+const backingAllEntityIds = writable<string[]>([]);
+
+/**
+ * Every entity id in the house, from the last unscoped snapshot. While the
+ * subscription is scoped to a dashboard the state table holds only its
+ * entities, so anything that matches against the whole house (wildcard cards,
+ * the scope itself) reads this instead.
+ */
+export const allEntityIds: Readable<string[]> = { subscribe: backingAllEntityIds.subscribe };
+
+export function setAllEntityIds(ids: string[]): void {
+	const current = get(backingAllEntityIds);
+	if (current.length === ids.length && current.every((id, index) => id === ids[index])) return;
+	backingAllEntityIds.set(ids);
+}
 
 /** Which of the named feature bits are set in supported_features. */
 export function getSupport(

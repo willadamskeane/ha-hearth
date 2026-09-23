@@ -1,5 +1,9 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { get } from 'svelte/store';
+	import { allEntityIds, states } from '$lib/core/ha/entities';
+	import { entityScope } from '$lib/core/ha/entitySubscription';
+	import { configEntityIds, dashboardEntityScope } from './entityScope';
 	import { lang } from '$lib/core/i18n';
 	import { THEME_PRESETS, type HearthTheme } from '$lib/core/theme';
 	import {
@@ -7,7 +11,8 @@
 		hearthConfig,
 		hearthEditMode,
 		hearthLoadError,
-		hearthNeedsSetup
+		hearthNeedsSetup,
+		popup
 	} from './store';
 	import ControlPopup from './ControlPopup.svelte';
 	import Rail from './Rail.svelte';
@@ -90,6 +95,22 @@
 	// ?menu=false hides the edit-toggle pencil for kiosk frames; edit mode
 	// stays reachable if already active, it just can't be entered from here
 	let hideEditToggle = $state(false);
+
+	// Subscribe to the entities this dashboard can show, not the whole house:
+	// on a wall tablet, copying every entity on every update was most of the
+	// idle script time. Editing, search and the setup wizard need everything,
+	// as does the first snapshot, which also lists every entity for wildcards.
+	let configIds = $derived(configEntityIds($hearthConfig, $allEntityIds));
+	$effect(() => {
+		const scope =
+			$hearthEditMode || showSearch || showSetupWizard || !$allEntityIds.length
+				? null
+				: dashboardEntityScope(configIds, $allEntityIds, $states, [$popup?.entity]);
+		const current = get(entityScope);
+		const changed =
+			scope === null ? current !== null : current === null || current.join(',') !== scope.join(',');
+		if (changed) entityScope.set(scope);
+	});
 	let perfParam = $state(false);
 	let perfOverlay = $derived(perfParam || $hearthConfig.perf_overlay === true);
 

@@ -10,7 +10,6 @@ import {
 	ERR_INVALID_HTTPS_TO_HTTP,
 	getAuth,
 	subscribeConfig,
-	subscribeEntities,
 	subscribeServices,
 	type Auth,
 	type AuthData,
@@ -19,7 +18,8 @@ import {
 	type HassServices
 } from 'home-assistant-js-websocket';
 import type { Configuration, PersistentNotification } from '../app/configuration';
-import { cancelQueuedStates, queueStates } from './entities';
+import { cancelQueuedStates, queueStates, setAllEntityIds } from './entities';
+import { entityScope, subscribeScopedEntities } from './entitySubscription';
 
 /*
  * The one Home Assistant connection. Everything that reaches the server goes
@@ -178,10 +178,30 @@ export async function authentication(
 		// listener can be attached, so the initial connect is marked by hand
 		health.set('connected');
 
-		// these three keep themselves alive across reconnects inside the library
-		subscribeEntities(conn, (hassEntities) => {
-			if (get(connection) === conn) queueStates(hassEntities);
+		// entity states follow the scope the dashboard asks for; the previous
+		// subscription stays live until the new one has delivered its snapshot, so
+		// the table never goes empty in between
+		let stopEntities: (() => void) | undefined;
+		stopEntityScope?.();
+		const stopScope = entityScope.subscribe((scope) => {
+			const previous = stopEntities;
+			let handedOver = false;
+			stopEntities = subscribeScopedEntities(conn, scope, (hassEntities) => {
+				if (get(connection) !== conn) return;
+				if (!handedOver) {
+					handedOver = true;
+					previous?.();
+				}
+				if (scope === null) setAllEntityIds(Object.keys(hassEntities).sort());
+				queueStates(hassEntities);
+			});
 		});
+		stopEntityScope = () => {
+			stopScope();
+			stopEntities?.();
+			stopEntityScope = undefined;
+		};
+		// these two keep themselves alive across reconnects inside the library
 		subscribeConfig(conn, (hassConfig) => {
 			if (get(connection) === conn) config.set(hassConfig);
 		});
@@ -304,6 +324,9 @@ let currentRun = 0;
  * it again (after the token changed, say) restarts the loop; the library owns
  * reconnects once a connection exists, so success ends the loop for good.
  */
+// releases the current connection's scope listener and entity subscription
+let stopEntityScope: (() => void) | undefined;
+
 export function startConnection(configuration: Configuration, hooks: ConnectionHooks = {}) {
 	stopConnection();
 	const run = ++currentRun;
@@ -332,6 +355,7 @@ export function stopConnection() {
 	if (retryTimer) clearInterval(retryTimer);
 	retryTimer = undefined;
 	cancelQueuedStates();
+	stopEntityScope?.();
 	// an attempt still awaiting createConnection sees a stale run and discards its socket
 	currentRun += 1;
 	const previous = get(connection);
