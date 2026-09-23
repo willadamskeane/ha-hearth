@@ -1,6 +1,7 @@
 import type { Action } from 'svelte/action';
 import type { SliderUpdateMode } from '$lib/core/app/configuration';
 import { vibrate } from '$lib/core/app/haptics';
+import { pressNearScroll, tapSuppressed } from '$lib/ui/scrollGuard';
 
 interface DragOptions {
 	/** Updates the preview. `commit` says whether device state should also be sent. */
@@ -24,10 +25,22 @@ interface DragOptions {
 	ignore?: string;
 }
 
+/** Movement (in either direction) beyond which a press is no longer a tap. */
+const TAP_SLOP_PX = 10;
+/** How long after a qualifying pointerup the browser's click may still arrive. */
+const ARMED_TAP_MS = 500;
+
 /**
- * Horizontal drag-to-value with tap detection: movement up to 10px counts as a
- * tap, anything more sets a 0-100 value from the pointer's position within the
- * element. Apply `touch-action: none` on the element so touch drags work.
+ * Horizontal drag-to-value with tap detection: a press that stays within 10px
+ * in both directions counts as a tap, horizontal movement beyond that sets a
+ * 0-100 value from the pointer's position within the element. Apply
+ * `touch-action: none` (or `pan-y`, to keep vertical scrolling) on the element
+ * so touch drags work.
+ *
+ * The tap fires on the browser's `click`, not on pointerup: the browser
+ * withholds click for touches that were really a scroll or stopped a fling,
+ * which raw pointer events can't tell apart. A touch that begins while the page
+ * is scrolling, or just after, is never a tap (see ui/scrollGuard).
  */
 export const horizontalDrag: Action<HTMLElement, DragOptions> = (node, options) => {
 	let current = options;
@@ -36,9 +49,16 @@ export const horizontalDrag: Action<HTMLElement, DragOptions> = (node, options) 
 		held: boolean;
 		pointerId: number;
 		startX: number;
+		startY: number;
+		/** Moved beyond the tap slop in any direction. */
+		strayed: boolean;
+		/** Began while the page was scrolling or had only just stopped. */
+		nearScroll: boolean;
 		lastStep: number;
 	} | null = null;
 	let holdTimer: ReturnType<typeof setTimeout> | undefined;
+	/** When the tap waiting for its click expires; 0 when none is waiting. */
+	let armedUntil = 0;
 
 	function stepIndex(value: number) {
 		return Math.floor(value / Math.max(1, current.step ?? 5));
@@ -66,6 +86,7 @@ export const horizontalDrag: Action<HTMLElement, DragOptions> = (node, options) 
 	function handleDown(event: PointerEvent) {
 		if (current.disabled) return;
 		if (current.ignore && (event.target as Element).closest?.(current.ignore)) return;
+		armedUntil = 0;
 		try {
 			node.setPointerCapture(event.pointerId);
 		} catch {
@@ -76,12 +97,15 @@ export const horizontalDrag: Action<HTMLElement, DragOptions> = (node, options) 
 			held: false,
 			pointerId: event.pointerId,
 			startX: event.clientX,
+			startY: event.clientY,
+			strayed: false,
+			nearScroll: pressNearScroll(event),
 			// the step under the finger, so staying inside it stays silent
 			lastStep: stepIndex(Math.round(fraction(event) * 100))
 		};
 		if (current.hold) {
 			holdTimer = setTimeout(() => {
-				if (!tracking || tracking.moved) return;
+				if (!tracking || tracking.strayed || tracking.nearScroll) return;
 				tracking.held = true;
 				vibrate('hold');
 				current.hold?.();
@@ -91,10 +115,13 @@ export const horizontalDrag: Action<HTMLElement, DragOptions> = (node, options) 
 
 	function handleMove(event: PointerEvent) {
 		if (!tracking || event.pointerId !== tracking.pointerId || tracking.held) return;
-		if (Math.abs(event.clientX - tracking.startX) > 10) {
-			tracking.moved = true;
+		const dx = Math.abs(event.clientX - tracking.startX);
+		const dy = Math.abs(event.clientY - tracking.startY);
+		if (dx > TAP_SLOP_PX || dy > TAP_SLOP_PX) {
+			tracking.strayed = true;
 			clearTimeout(holdTimer);
 		}
+		if (dx > TAP_SLOP_PX) tracking.moved = true;
 		if (tracking.moved) {
 			const value = Math.round(fraction(event) * 100);
 			feedStep(value);
@@ -106,8 +133,6 @@ export const horizontalDrag: Action<HTMLElement, DragOptions> = (node, options) 
 		if (!tracking || event.pointerId !== tracking.pointerId) return;
 		if (tracking.held) {
 			// the hold already acted; the release must not toggle on top of it
-		} else if (!tracking.moved && current.tap) {
-			current.tap();
 		} else if (tracking.moved) {
 			const value = Math.round(fraction(event) * 100);
 			// Always commit the final value. In release mode this is the gesture's
@@ -115,8 +140,19 @@ export const horizontalDrag: Action<HTMLElement, DragOptions> = (node, options) 
 			vibrate('commit');
 			current.set(value, true);
 			current.end?.(value);
+		} else if (!tracking.strayed && !tracking.nearScroll && current.tap) {
+			// wait for the click, which the browser skips if this was a scroll
+			armedUntil = performance.now() + ARMED_TAP_MS;
 		}
 		finishTracking(event.pointerId);
+	}
+
+	function handleClick(event: MouseEvent) {
+		const armed = armedUntil > performance.now();
+		armedUntil = 0;
+		// keyboard clicks (never armed) are the element's own business
+		if (!armed || tapSuppressed(event) || current.disabled) return;
+		current.tap?.();
 	}
 
 	function finishTracking(pointerId: number) {
@@ -140,6 +176,7 @@ export const horizontalDrag: Action<HTMLElement, DragOptions> = (node, options) 
 	node.addEventListener('pointermove', handleMove);
 	node.addEventListener('pointerup', handleUp);
 	node.addEventListener('pointercancel', handleCancel);
+	node.addEventListener('click', handleClick);
 
 	return {
 		update(next) {
@@ -150,6 +187,7 @@ export const horizontalDrag: Action<HTMLElement, DragOptions> = (node, options) 
 			node.removeEventListener('pointermove', handleMove);
 			node.removeEventListener('pointerup', handleUp);
 			node.removeEventListener('pointercancel', handleCancel);
+			node.removeEventListener('click', handleClick);
 			if (tracking) finishTracking(tracking.pointerId);
 		}
 	};

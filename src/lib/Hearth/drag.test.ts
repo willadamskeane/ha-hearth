@@ -10,13 +10,20 @@ class TestNode extends EventTarget {
 	}
 }
 
-function pointer(type: string, clientX: number) {
+function pointer(type: string, clientX: number, clientY = 0, pointerType = 'touch') {
 	const event = new Event(type) as PointerEvent;
 	Object.defineProperties(event, {
 		clientX: { value: clientX },
+		clientY: { value: clientY },
+		pointerType: { value: pointerType },
 		pointerId: { value: 1 }
 	});
 	return event;
+}
+
+/** The click a browser sends after a pointer tap (detail 1), or a keyboard one (0). */
+function click(detail = 1) {
+	return new MouseEvent('click', { detail });
 }
 
 describe('horizontalDrag touch feedback', () => {
@@ -106,6 +113,9 @@ describe('horizontalDrag', () => {
 		action?.update?.({ set: vi.fn(), tap: secondTap });
 		node.dispatchEvent(pointer('pointerdown', 20));
 		node.dispatchEvent(pointer('pointerup', 24));
+		// the tap waits for the browser's click
+		expect(secondTap).not.toHaveBeenCalled();
+		node.dispatchEvent(click());
 		expect(firstTap).not.toHaveBeenCalled();
 		expect(secondTap).toHaveBeenCalledOnce();
 	});
@@ -118,6 +128,7 @@ describe('horizontalDrag', () => {
 		node.dispatchEvent(pointer('pointerdown', 20));
 		node.dispatchEvent(pointer('pointermove', 30));
 		node.dispatchEvent(pointer('pointerup', 30));
+		node.dispatchEvent(click());
 		expect(tap).toHaveBeenCalledOnce();
 		expect(set).not.toHaveBeenCalled();
 	});
@@ -131,11 +142,71 @@ describe('horizontalDrag', () => {
 		node.dispatchEvent(pointer('pointerdown', 20));
 		node.dispatchEvent(pointer('pointercancel', 25));
 		node.dispatchEvent(pointer('pointerup', 210));
+		node.dispatchEvent(click());
 
 		expect(set).not.toHaveBeenCalled();
 		expect(tap).not.toHaveBeenCalled();
 		expect(node.releasePointerCapture).toHaveBeenCalledWith(1);
 		action?.destroy?.();
+	});
+
+	it('does not tap after vertical drift beyond the slop, and sets no value', () => {
+		const node = new TestNode();
+		const set = vi.fn();
+		const tap = vi.fn();
+		horizontalDrag(node as unknown as HTMLElement, { set, tap });
+		node.dispatchEvent(pointer('pointerdown', 20, 100));
+		node.dispatchEvent(pointer('pointermove', 22, 115));
+		node.dispatchEvent(pointer('pointerup', 22, 115));
+		node.dispatchEvent(click());
+		expect(tap).not.toHaveBeenCalled();
+		expect(set).not.toHaveBeenCalled();
+	});
+
+	it('does not tap when the browser sends no click, as for a touch that stops a fling', () => {
+		const node = new TestNode();
+		const tap = vi.fn();
+		horizontalDrag(node as unknown as HTMLElement, { set: vi.fn(), tap });
+		node.dispatchEvent(pointer('pointerdown', 20));
+		node.dispatchEvent(pointer('pointerup', 20));
+		// a later click from an unrelated gesture (or the keyboard) must not use it
+		node.dispatchEvent(pointer('pointerdown', 20));
+		node.dispatchEvent(click(0));
+		expect(tap).not.toHaveBeenCalled();
+	});
+
+	it('ignores keyboard clicks, which the element handles itself', () => {
+		const node = new TestNode();
+		const tap = vi.fn();
+		horizontalDrag(node as unknown as HTMLElement, { set: vi.fn(), tap });
+		node.dispatchEvent(click(0));
+		expect(tap).not.toHaveBeenCalled();
+	});
+
+	it('does not tap or hold for a press that begins while the page is scrolling', () => {
+		vi.useFakeTimers();
+		try {
+			const node = new TestNode();
+			const tap = vi.fn();
+			const hold = vi.fn();
+			horizontalDrag(node as unknown as HTMLElement, { set: vi.fn(), tap, hold });
+			window.dispatchEvent(new Event('scroll'));
+			node.dispatchEvent(pointer('pointerdown', 20));
+			vi.advanceTimersByTime(600);
+			node.dispatchEvent(pointer('pointerup', 20));
+			node.dispatchEvent(click());
+			expect(tap).not.toHaveBeenCalled();
+			expect(hold).not.toHaveBeenCalled();
+
+			// a mouse click right after a wheel scroll is deliberate
+			window.dispatchEvent(new Event('scroll'));
+			node.dispatchEvent(pointer('pointerdown', 20, 0, 'mouse'));
+			node.dispatchEvent(pointer('pointerup', 20, 0, 'mouse'));
+			node.dispatchEvent(click());
+			expect(tap).toHaveBeenCalledOnce();
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 });
 

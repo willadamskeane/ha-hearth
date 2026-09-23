@@ -31,6 +31,7 @@
 	import { wakeLock } from './wakeLock';
 	import ScrollEdge from '$lib/ui/ScrollEdge.svelte';
 	import { scrollEdges, type ScrollEdges } from '$lib/ui/actions/scrollEdges';
+	import { suppressScrollTaps } from '$lib/ui/scrollGuard';
 
 	let showSetupWizard = $state(false);
 	let showSearch = $state(false);
@@ -156,7 +157,7 @@
 <Keyboard onsearch={() => (showSearch = true)} />
 <ThemeStyle {presetOverride} />
 
-<section class="frame" use:wakeLock={$hearthConfig.keep_screen_on ?? true}>
+<section class="frame" use:wakeLock={$hearthConfig.keep_screen_on ?? true} use:suppressScrollTaps>
 	<div
 		class="layout"
 		class:editing={$hearthEditMode}
