@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.20
+
+- Fix camera grid snapshots showing in the right half of their tiles.
+
 ## 0.1.19
 
 - The camera card can show several cameras (`entities: [...]`) as a two-column grid of snapshots. Each is named, and tapping one opens its live view. A single camera works as before.
