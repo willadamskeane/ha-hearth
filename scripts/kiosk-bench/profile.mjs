@@ -132,6 +132,32 @@ try {
 	const byComponent = new Map();
 	const rows = [];
 
+	// --idle <seconds>: profile the page sitting still (entity updates, clocks,
+	// timers) instead of switching pages
+	if (args.idle) {
+		const before = await metrics();
+		await cdp.send('Profiler.start');
+		await page.waitForTimeout(Number(args.idle) * 1000);
+		const { profile } = await cdp.send('Profiler.stop');
+		const after = await metrics();
+		const bySource = new Map();
+		for (const [key, ms] of selfTimes(profile)) {
+			const source = key.replace(/:\d+.*$/, '');
+			bySource.set(source, (bySource.get(source) ?? 0) + ms);
+		}
+		console.log(
+			`\nidle ${args.idle}s at ${args.throttle}x: script ${Math.round((after.ScriptDuration - before.ScriptDuration) * 1000)}ms · style ${Math.round((after.RecalcStyleDuration - before.RecalcStyleDuration) * 1000)} · layout ${Math.round((after.LayoutDuration - before.LayoutDuration) * 1000)}`
+		);
+		console.table(
+			[...bySource.entries()]
+				.filter(([key]) => !/^\((idle|program|garbage collector|root)\)/.test(key))
+				.sort((a, b) => b[1] - a[1])
+				.slice(0, Number(args.top))
+				.map(([source, ms]) => ({ source, ms: Math.round(ms) }))
+		);
+		args.repeat = 0;
+	}
+
 	for (let repeat = 0; repeat < Number(args.repeat); repeat++) {
 		for (let index = 1; index <= tabs.length; index++) {
 			const target = index % tabs.length; // ends back on Home
@@ -167,55 +193,58 @@ try {
 		}
 	}
 
-	// average the repeats per page
-	const perPage = new Map();
-	for (const row of rows) {
-		const entry = perPage.get(row.page) ?? {
-			page: row.page,
-			n: 0,
-			switch: 0,
-			settled: 0,
-			script: 0,
-			style: 0,
-			layout: 0,
-			nodes: 0
-		};
-		entry.n++;
-		for (const key of ['switch', 'settled', 'script', 'style', 'layout']) entry[key] += row[key];
-		entry.nodes = row.nodes;
-		perPage.set(row.page, entry);
+	if (!args.idle) report();
+	function report() {
+		// average the repeats per page
+		const perPage = new Map();
+		for (const row of rows) {
+			const entry = perPage.get(row.page) ?? {
+				page: row.page,
+				n: 0,
+				switch: 0,
+				settled: 0,
+				script: 0,
+				style: 0,
+				layout: 0,
+				nodes: 0
+			};
+			entry.n++;
+			for (const key of ['switch', 'settled', 'script', 'style', 'layout']) entry[key] += row[key];
+			entry.nodes = row.nodes;
+			perPage.set(row.page, entry);
+		}
+		console.log(`\nper page switch at ${args.throttle}x CPU throttle (ms, mean of ${args.repeat})`);
+		console.table(
+			[...perPage.values()].map((e) => ({
+				page: e.page,
+				firstPaint: Math.round(e.switch / e.n),
+				settled: Math.round(e.settled / e.n),
+				script: Math.round(e.script / e.n),
+				style: Math.round(e.style / e.n),
+				layout: Math.round(e.layout / e.n),
+				domNodes: e.nodes
+			}))
+		);
+		const sum = (key) => rows.reduce((s, r) => s + r[key], 0);
+		console.log(
+			`totals: switch ${sum('switch')}ms · script ${sum('script')} · style ${sum('style')} · layout ${sum('layout')}`
+		);
+		console.log(`\ntime by the Hearth code that caused it, across all switches (ms)`);
+		console.table(
+			[...byComponent.entries()]
+				.sort((a, b) => b[1] - a[1])
+				.slice(0, Number(args.top))
+				.map(([code, ms]) => ({ code, ms: Math.round(ms) }))
+		);
+		console.log(`\ntop self time across all switches (ms)`);
+		console.table(
+			[...total.entries()]
+				.filter(([key]) => !/^\((idle|program|garbage collector|root)\)/.test(key))
+				.sort((a, b) => b[1] - a[1])
+				.slice(0, Number(args.top))
+				.map(([fn, ms]) => ({ fn, ms: Math.round(ms) }))
+		);
 	}
-	console.log(`\nper page switch at ${args.throttle}x CPU throttle (ms, mean of ${args.repeat})`);
-	console.table(
-		[...perPage.values()].map((e) => ({
-			page: e.page,
-			firstPaint: Math.round(e.switch / e.n),
-			settled: Math.round(e.settled / e.n),
-			script: Math.round(e.script / e.n),
-			style: Math.round(e.style / e.n),
-			layout: Math.round(e.layout / e.n),
-			domNodes: e.nodes
-		}))
-	);
-	const sum = (key) => rows.reduce((s, r) => s + r[key], 0);
-	console.log(
-		`totals: switch ${sum('switch')}ms · script ${sum('script')} · style ${sum('style')} · layout ${sum('layout')}`
-	);
-	console.log(`\ntime by the Hearth code that caused it, across all switches (ms)`);
-	console.table(
-		[...byComponent.entries()]
-			.sort((a, b) => b[1] - a[1])
-			.slice(0, Number(args.top))
-			.map(([code, ms]) => ({ code, ms: Math.round(ms) }))
-	);
-	console.log(`\ntop self time across all switches (ms)`);
-	console.table(
-		[...total.entries()]
-			.filter(([key]) => !/^\((idle|program|garbage collector|root)\)/.test(key))
-			.sort((a, b) => b[1] - a[1])
-			.slice(0, Number(args.top))
-			.map(([fn, ms]) => ({ fn, ms: Math.round(ms) }))
-	);
 } finally {
 	await browser.close();
 	stack.stop();
