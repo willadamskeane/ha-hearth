@@ -209,25 +209,37 @@ export function sortable<T>(
 		};
 	}
 
-	const instance = Sortable.create(node, buildSortableOptions());
+	// A disabled zone never becomes a Sortable: outside edit mode every page
+	// build would otherwise pay for SortableJS setup it cannot use. The
+	// instance is created when dragging is enabled and dropped when it is not.
+	let instance: Sortable | null = options.disabled
+		? null
+		: Sortable.create(node, buildSortableOptions());
 
 	return {
 		update(newOptions: DndOptions<T>) {
-			// Update mutable options without recreating instance
-			if (newOptions.disabled !== options.disabled) {
-				instance.option('disabled', newOptions.disabled ?? false);
-			}
-			if (newOptions.animation !== options.animation) {
-				instance.option('animation', newOptions.animation ?? 150);
-			}
-			if (JSON.stringify(newOptions.group) !== JSON.stringify(options.group)) {
-				instance.option('group', newOptions.group);
-			}
+			const previous = options;
 			// Update the options reference so callbacks use fresh data
 			options = newOptions;
+			if (newOptions.disabled) {
+				instance?.destroy();
+				instance = null;
+				return;
+			}
+			if (!instance) {
+				instance = Sortable.create(node, buildSortableOptions());
+				return;
+			}
+			if (newOptions.animation !== previous.animation) {
+				instance.option('animation', newOptions.animation ?? 150);
+			}
+			if (JSON.stringify(newOptions.group) !== JSON.stringify(previous.group)) {
+				instance.option('group', newOptions.group);
+			}
 		},
 		destroy() {
-			instance.destroy();
+			instance?.destroy();
+			instance = null;
 		}
 	};
 }
