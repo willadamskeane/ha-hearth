@@ -161,29 +161,42 @@
 	});
 </script>
 
+<!-- most cards have no visibility conditions; they skip the gate entirely -->
 {#snippet cardSlot(card: OverviewCard, target: { kind: 'card'; roomId: string; id: string })}
-	<VisibilityGate conditions={card.visibility}>
-		{#snippet children(visible)}
-			{#if $hearthEditMode || visible}
-				<div
-					class="card-slot"
-					data-id={card.id}
-					data-card-type={card.type}
-					style:--card-min-height={cardDescriptor(card.type).stretchMinHeight
-						? `${cardDescriptor(card.type).stretchMinHeight}px`
-						: undefined}
-					class:stretch={fillWeight(card) > 0}
-					style:--card-fill={fillWeight(card)}
-					class:visibility-dimmed={$hearthEditMode && !visible}
-				>
-					{#if $hearthEditMode}
-						<EditChip onedit={() => editor.set(target)} />
-					{/if}
-					<CardRenderer {card} />
-				</div>
+	{#if card.visibility?.length}
+		<VisibilityGate conditions={card.visibility}>
+			{#snippet children(visible)}
+				{@render cardBody(card, target, visible)}
+			{/snippet}
+		</VisibilityGate>
+	{:else}
+		{@render cardBody(card, target, true)}
+	{/if}
+{/snippet}
+
+{#snippet cardBody(
+	card: OverviewCard,
+	target: { kind: 'card'; roomId: string; id: string },
+	visible: boolean
+)}
+	{#if $hearthEditMode || visible}
+		<div
+			class="card-slot"
+			data-id={card.id}
+			data-card-type={card.type}
+			style:--card-min-height={cardDescriptor(card.type).stretchMinHeight
+				? `${cardDescriptor(card.type).stretchMinHeight}px`
+				: undefined}
+			class:stretch={fillWeight(card) > 0}
+			style:--card-fill={fillWeight(card)}
+			class:visibility-dimmed={$hearthEditMode && !visible}
+		>
+			{#if $hearthEditMode}
+				<EditChip onedit={() => editor.set(target)} />
 			{/if}
-		{/snippet}
-	</VisibilityGate>
+			<CardRenderer {card} />
+		</div>
+	{/if}
 {/snippet}
 
 <div

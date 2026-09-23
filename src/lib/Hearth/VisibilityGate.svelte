@@ -20,7 +20,8 @@
 			.map((condition) => condition.media);
 
 		if (queries.length === 0) {
-			mediaMatches = {};
+			// no write when there is nothing to clear: every card mounts this
+			if (Object.keys(mediaMatches).length) mediaMatches = {};
 			return;
 		}
 
