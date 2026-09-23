@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.16
+
+- Open pages faster on slow tablets: columns build their first two cards before the first frame and the rest right after, SortableJS is only set up while editing, and date/time formatters are cached instead of rebuilt every second. On the ThinkSmart View benchmark, long tasks while switching pages drop by about half.
+
 ## 0.1.15
 
 - Add an opt-in performance overlay (`perf_overlay: true` in the dashboard config, or `?perf=1`) showing frame pacing, long tasks by frame, the scripts behind long frames, per-tap timings and the entity update rate. It loads only when enabled.
