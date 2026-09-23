@@ -3,7 +3,7 @@
 	import Ripple from '$lib/ui/actions/ripple';
 	import { connected } from '$lib/core/ha/connection';
 	import { lang, selectedLanguage } from '$lib/core/i18n';
-	import { dateKey, parseLocalDate } from '$lib/core/i18n/time';
+	import { dateKey, dateTimeFormat, parseLocalDate } from '$lib/core/i18n/time';
 	import { timer } from '$lib/core/app/clock';
 	import { entityState } from '$lib/core/ha/entities';
 	import { PRESS_RIPPLE, type RailWidget } from '../../config';
@@ -77,11 +77,12 @@
 	let configuredClock = $derived($hearthConfig.rail.find((widget) => widget.type === 'clock'));
 	let selectedTravel = $derived(entityState(widget.travel_entity));
 
+	// timeLine re-derives every clock tick; format with cached formatters
 	function clockTime(date: Date) {
-		return date.toLocaleTimeString(
+		return dateTimeFormat(
 			$selectedLanguage,
 			clockTimeOptions($displayTimeZone, configuredClock?.hour_format)
-		);
+		).format(date);
 	}
 
 	let timeLine = $derived.by(() => {
@@ -92,10 +93,10 @@
 		const sameDay = eventDay === dateKey($timer, $displayTimeZone);
 		const day = sameDay
 			? ''
-			: `${next.start.toLocaleDateString($selectedLanguage, {
+			: `${dateTimeFormat($selectedLanguage, {
 					weekday: 'long',
 					...(next.allDay || !$displayTimeZone ? {} : { timeZone: $displayTimeZone })
-				})} `;
+				}).format(next.start)} `;
 		if (next.allDay) return `${day}${$lang('hearth_all_day')}`.trim();
 		let line = `${day}${clockTime(next.start)}`;
 		const travelMinutes = widget.travel_entity ? sensorNumber($selectedTravel?.state) : null;
