@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.18
+
+- Stop scrolling from toggling lights: tiles act on a real tap only, meaning one that stays within 10px either way and that the browser doesn't treat as a scroll. A touch that lands while the page is scrolling, or within 300ms of it, presses nothing, and touch ripples wait a moment so tiles don't flash under a passing finger. Mouse and keyboard work as before.
+
 ## 0.1.17
 
 - Subscribe only to the entities a dashboard shows instead of every entity in the house, widening to everything while editing, searching or setting up. On a large house this removes most idle script work and makes page loads lighter.
