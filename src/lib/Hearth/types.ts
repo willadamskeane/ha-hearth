@@ -211,7 +211,15 @@ type OverviewCardVariant =
 			summary_entity?: string;
 			entities: EntityRef[];
 	  }
-	| { id: string; type: 'camera'; entity?: string; title?: string; stream?: boolean }
+	| {
+			id: string;
+			type: 'camera';
+			entity?: string;
+			/** Several cameras, shown as a grid of snapshots; takes over from `entity`. */
+			entities?: string[];
+			title?: string;
+			stream?: boolean;
+	  }
 	// integration-provided still images, including native Roborock floor maps
 	| { id: string; type: 'image'; entity?: string; title?: string }
 	| { id: string; type: 'climate'; entity?: string; title?: string }
