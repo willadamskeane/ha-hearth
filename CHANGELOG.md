@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.15
+
+- Add an opt-in performance overlay (`perf_overlay: true` in the dashboard config, or `?perf=1`) showing frame pacing, long tasks by frame, the scripts behind long frames, per-tap timings and the entity update rate. It loads only when enabled.
+
 ## 0.1.14
 
 - Move the narrow-layout edit toggle from the end of the page tabs to the end of the status strip, giving the tabs their full width back. Without strip widgets it stays beside the tabs; `?menu=false` still hides it.
