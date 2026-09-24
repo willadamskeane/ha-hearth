@@ -6,24 +6,62 @@ Hearth is an early-stage project and is actively evolving.
 
 ![Hearth dashboard preview](preview.jpg)
 
+## About this fork
+
+This is [Will Adams-Keane](https://github.com/willadamskeane)'s fork of [knowald/ha-hearth](https://github.com/knowald/ha-hearth). It exists to run Hearth well on a real wall tablet: a Lenovo ThinkSmart View, an Android 8 device with Chrome 138, that sits in a study, runs Hearth in the Kiosk Satellite app through Home Assistant Ingress, and doubles as a [Voice Satellite](https://github.com/jxlarrea/voice-satellite-card-integration). Stock Hearth struggled on that hardware in four ways: authentication inside Ingress, rendering cost on a slow GPU, a layout meant for wider screens, and touch handling on a scrolling wall of light tiles. The changes below were developed and checked on that device.
+
+It branched from upstream 0.1.0 on 2026-09-20. Its releases, 0.1.1 to 0.1.20, are numbered separately from upstream, which has since reached 0.3.0 with its own changes that aren't merged here. See [CHANGELOG.md](CHANGELOG.md) for the full list.
+
+### What's different
+
+**Home Assistant Ingress and kiosk access** (0.1.1–0.1.8)
+
+- Reuses the authenticated Home Assistant frontend session inside Ingress, avoiding the OAuth redirect Home Assistant rejects in the Ingress iframe, and derives the browser-facing URL from trusted Ingress headers. The Supervisor hostname stays on the server.
+- Adds an IP-restricted direct route for kiosk tablets. Its server-side WebSocket and HTTP proxy authenticate to Home Assistant without exposing the Supervisor credential to the browser. It pairs with the fork's [add-on](https://github.com/willadamskeane/addon-ha-hearth).
+- Hides Home Assistant's panel title bar in Ingress and keeps Voice Satellite and wake-word handling working when Kiosk Satellite rewrites the browser route.
+
+**Performance on low-end tablets** (0.1.4, 0.1.15–0.1.17)
+
+- Adds an automatic low-power mode that drops backdrop blurs, animated shadows and other expensive compositor effects on weak devices, while keeping the full look on capable ones.
+- Subscribes only to the entities a dashboard shows, instead of every entity in the house. It widens back to everything while editing or searching. On the test house this removed about 85% of idle script time.
+- Pages open faster. Columns build their first cards before the first frame, SortableJS loads only in edit mode, `Intl` formatters are cached, and light and cover tiles render directly. On the ThinkSmart View, long tasks while switching pages dropped by about half.
+- Adds an opt-in performance overlay (`perf_overlay: true` or `?perf=1`), plus a kiosk benchmark and a local profiler under `scripts/kiosk-bench/`. They replay a captured house against a fake Home Assistant and never change real entity state.
+
+**Narrow and tablet layout** (0.1.10–0.1.14)
+
+- On narrow screens the rail's glanceable widgets (clock, date, energy and so on) sit in a compact status strip at the top of the page, not at the bottom of every page.
+- The room header is compact, and the edit toggle lives in the status strip instead of floating over page content.
+
+**Touch that doesn't fight scrolling** (0.1.18)
+
+- Light tiles act only on a real tap, meaning one that stays within 10 px in both directions and that the browser doesn't treat as a scroll. A touch that lands while the page is scrolling, or within 300 ms after, presses nothing, and touch ripples wait a moment so tiles don't flash under a passing finger. Mouse and keyboard behave as before.
+
+**Cameras** (0.1.19–0.1.20)
+
+- The camera card accepts several cameras (`entities: [...]`) and shows them as a two-column grid of named snapshots. Tapping one opens its live view.
+
+**Smaller fixes**
+
+- The energy reading is scaled to kWh (Wh sensors previously read as `7234.0 kWh`), and contact sensors read Open/Closed instead of On/Off.
+
 ## Home Assistant add-on
 
 On Home Assistant OS or Supervised, install Hearth from its add-on repository:
 
-[![Open your Home Assistant instance and show the add add-on repository dialog with a specific repository URL pre-filled.](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fknowald%2Faddon-ha-hearth)
+[![Open your Home Assistant instance and show the add add-on repository dialog with a specific repository URL pre-filled.](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fwilladamskeane%2Faddon-ha-hearth)
 
-To add it by hand, open Settings, Add-ons, Add-on Store, then Repositories from the overflow menu, and paste `https://github.com/knowald/addon-ha-hearth`. Install Hearth from the store once the repository is listed.
+To add it by hand, open Settings, Add-ons, Add-on Store, then Repositories from the overflow menu, and paste `https://github.com/willadamskeane/addon-ha-hearth`. Install "Hearth (Will's fork)" from the store once the repository is listed. For upstream Hearth, use [knowald/addon-ha-hearth](https://github.com/knowald/addon-ha-hearth) instead.
 
 The add-on appears in the sidebar and is served over Ingress. Set a port in its configuration to expose it directly as well, which is what wall tablets should use. Dashboard configuration is stored on the add-on's own volume and survives updates.
 
-The packaging lives in [knowald/addon-ha-hearth](https://github.com/knowald/addon-ha-hearth). Each add-on version builds the `ha-hearth` tag of the same name.
+The packaging for this fork lives in [willadamskeane/addon-ha-hearth](https://github.com/willadamskeane/addon-ha-hearth). Each add-on version builds the tag of the same name from this repository.
 
 ## Run locally
 
 Requirements: Node.js 22 or newer and pnpm 10 or newer.
 
 ```sh
-git clone https://github.com/knowald/ha-hearth.git
+git clone https://github.com/willadamskeane/ha-hearth.git
 cd ha-hearth
 pnpm install --frozen-lockfile
 cp .env.example .env
@@ -53,7 +91,7 @@ docker compose --env-file .env.docker up -d --build
 
 The container listens on port 5050 and stores configuration under `/app/data`. Compose mounts `./data` by default; `DATA_PATH` changes that location. Use `docker compose logs` to inspect server logs.
 
-The publishing workflow targets `ghcr.io/knowald/ha-hearth` when a release is published. Local builds do not depend on an image already existing in the registry.
+The publishing workflow targets `ghcr.io/<repository owner>/ha-hearth` (`ghcr.io/willadamskeane/ha-hearth` for this fork) when a release is published. Local builds do not depend on an image already existing in the registry.
 
 ## Configuration
 
