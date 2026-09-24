@@ -1,8 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Connection } from 'home-assistant-js-websocket';
-import { playCamera } from './camera';
+import { clearStreamTypes, playCamera, resolveStreamType } from './camera';
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+	vi.unstubAllGlobals();
+	clearStreamTypes();
+});
 
 function videoElement() {
 	return {
@@ -40,6 +43,8 @@ describe('camera session ownership', () => {
 		const controller = new AbortController();
 		const video = videoElement();
 		const loading = playCamera(connection, video, 'camera.door', 'hls', controller.signal, vi.fn());
+		// cancel while the stream request is in flight
+		await vi.waitFor(() => expect(resolve).toBeDefined());
 		controller.abort();
 		resolve({ url: '/late.m3u8' });
 		await loading;
@@ -110,5 +115,66 @@ describe('camera session ownership', () => {
 		expect(stopTrack).toHaveBeenCalledOnce();
 		expect(unsubscribe).toHaveBeenCalledOnce();
 		expect(video.srcObject).toBeNull();
+	});
+});
+
+describe('stream type', () => {
+	function connectionWith(capabilities: unknown) {
+		const sendMessagePromise = vi.fn(async (message: { type: string }) =>
+			message.type === 'camera/capabilities' ? capabilities : { url: '/api/hls/stream.m3u8' }
+		);
+		return { sendMessagePromise, connection: { sendMessagePromise } as unknown as Connection };
+	}
+
+	it('asks Home Assistant for the stream types when the attribute is gone, once per camera', async () => {
+		const { connection, sendMessagePromise } = connectionWith({
+			frontend_stream_types: ['web_rtc']
+		});
+		expect(await resolveStreamType(connection, 'camera.door', undefined)).toBe('web_rtc');
+		expect(await resolveStreamType(connection, 'camera.door', undefined)).toBe('web_rtc');
+		expect(sendMessagePromise).toHaveBeenCalledTimes(1);
+		expect(sendMessagePromise).toHaveBeenCalledWith({
+			type: 'camera/capabilities',
+			entity_id: 'camera.door'
+		});
+	});
+
+	it('uses HLS when WebRTC is not offered or the question fails', async () => {
+		expect(
+			await resolveStreamType(
+				connectionWith({ frontend_stream_types: ['hls'] }).connection,
+				'camera.a',
+				undefined
+			)
+		).toBe('hls');
+		const failing = {
+			sendMessagePromise: vi.fn().mockRejectedValue(new Error('unknown command'))
+		} as unknown as Connection;
+		expect(await resolveStreamType(failing, 'camera.b', undefined)).toBe('hls');
+	});
+
+	it('trusts a legacy frontend_stream_type attribute without asking', async () => {
+		const { connection, sendMessagePromise } = connectionWith({});
+		expect(await resolveStreamType(connection, 'camera.c', 'web_rtc')).toBe('web_rtc');
+		expect(await resolveStreamType(connection, 'camera.c', 'hls')).toBe('hls');
+		expect(sendMessagePromise).not.toHaveBeenCalled();
+	});
+
+	it('plays over HLS only after capabilities rule out WebRTC', async () => {
+		const { connection, sendMessagePromise } = connectionWith({ frontend_stream_types: ['hls'] });
+		const video = videoElement();
+		await playCamera(
+			connection,
+			video,
+			'camera.hls',
+			undefined,
+			new AbortController().signal,
+			vi.fn()
+		);
+		expect(sendMessagePromise.mock.calls.map(([m]) => m.type)).toEqual([
+			'camera/capabilities',
+			'camera/stream'
+		]);
+		expect(video.src).toBe('/api/hls/stream.m3u8');
 	});
 });

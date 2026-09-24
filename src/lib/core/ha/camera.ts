@@ -7,6 +7,40 @@ type Signal =
 	| { type: 'candidate'; candidate: RTCIceCandidateInit }
 	| { type: 'error'; message: string };
 
+const streamTypes = new Map<string, 'web_rtc' | 'hls'>();
+
+/**
+ * How to play a camera: WebRTC when Home Assistant offers it, else HLS.
+ * Home Assistant 2024.11 stopped setting the `frontend_stream_type` attribute
+ * and reports stream types through `camera/capabilities` instead, so without
+ * the attribute this asks (once per camera per page load). WebRTC starts in
+ * about a second; HLS waits for Home Assistant to build segments, ~8 s cold.
+ */
+export async function resolveStreamType(
+	connection: Connection,
+	entity: string,
+	attribute: string | undefined
+): Promise<'web_rtc' | 'hls'> {
+	if (attribute) return attribute === 'web_rtc' ? 'web_rtc' : 'hls';
+	const known = streamTypes.get(entity);
+	if (known) return known;
+	try {
+		const capabilities = await connection.sendMessagePromise<{
+			frontend_stream_types?: string[];
+		}>({ type: 'camera/capabilities', entity_id: entity });
+		const type = capabilities.frontend_stream_types?.includes('web_rtc') ? 'web_rtc' : 'hls';
+		streamTypes.set(entity, type);
+		return type;
+	} catch {
+		return 'hls';
+	}
+}
+
+/** Forget cached stream types (tests). */
+export function clearStreamTypes() {
+	streamTypes.clear();
+}
+
 /** One playback session. Aborting releases media and signaling, including pending setup. */
 export async function playCamera(
 	connection: Connection,
@@ -43,7 +77,9 @@ export async function playCamera(
 	};
 	signal.addEventListener('abort', dispose, { once: true });
 	try {
-		if (streamType !== 'web_rtc') {
+		const type = await resolveStreamType(connection, entity, streamType);
+		if (closed) return;
+		if (type !== 'web_rtc') {
 			const response = await connection.sendMessagePromise<{ url?: string }>({
 				type: 'camera/stream',
 				entity_id: entity
