@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.21
+
+- Play live camera views over WebRTC when Home Assistant offers it. Home Assistant no longer reports a camera's stream type as an attribute, so Hearth always fell back to HLS, which takes about 8 s to start from cold; it now asks Home Assistant which stream types a camera supports.
+
 ## 0.1.20
 
 - Fix camera grid snapshots showing in the right half of their tiles.
