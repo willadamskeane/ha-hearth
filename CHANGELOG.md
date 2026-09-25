@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.24
+
+- Drop the extra 16 px side gutter the upstream merge added on narrow screens; they use only the configured side padding plus the device's safe area again.
+
 ## 0.1.23
 
 - Keep the status strip and page labels on small wall tablets such as the ThinkSmart View (788x492 CSS px). Upstream's phone-held-sideways layout matched any landscape screen up to 500 px tall; it now stops at 440 px, above the tallest phones.
