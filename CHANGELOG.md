@@ -1,8 +1,14 @@
 # Changelog
 
+## 0.1.22
+
+- Merge upstream Hearth 0.3.0 (see "Upstream 0.3.0 (merged)" below): clearer connection and config errors, one entity detail sheet everywhere, back-button closing, drag-to-set cover tiles, theme-token surfaces, editor improvements and more translations.
+- Keep the fork's status strip, scoped entity subscriptions, scroll-safe taps, camera grid and Ingress login; on narrow screens the strip replaces upstream's rail section above the page, except on a phone held sideways.
+- Load the setup wizard and sign-in sheet only when needed, keeping the main bundle within budget.
+
 ## Upstream 0.3.0 (merged)
 
-Changes from upstream [knowald/ha-hearth](https://github.com/knowald/ha-hearth) 0.1.1 through 0.3.0 (upstream 0.1.0 is the shared base, listed as 0.1.0 at the bottom), merged into this fork on top of 0.1.21 and not yet part of a fork release. Upstream's version numbers overlap the fork's 0.1.x releases below; the headings here are upstream's. Where both sides changed the same behaviour, the fork's behaviour was kept (see the merge commit).
+Changes from upstream [knowald/ha-hearth](https://github.com/knowald/ha-hearth) 0.1.1 through 0.3.0 (upstream 0.1.0 is the shared base, listed as 0.1.0 at the bottom), merged into this fork in 0.1.22. Upstream's version numbers overlap the fork's 0.1.x releases below; the headings here are upstream's. Where both sides changed the same behaviour, the fork's behaviour was kept (see the merge commit).
 
 ### Upstream [0.3.0] - 2026-09-23
 
