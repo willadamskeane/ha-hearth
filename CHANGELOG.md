@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.23
+
+- Keep the status strip and page labels on small wall tablets such as the ThinkSmart View (788x492 CSS px). Upstream's phone-held-sideways layout matched any landscape screen up to 500 px tall; it now stops at 440 px, above the tallest phones.
+
 ## 0.1.22
 
 - Merge upstream Hearth 0.3.0 (see "Upstream 0.3.0 (merged)" below): clearer connection and config errors, one entity detail sheet everywhere, back-button closing, drag-to-set cover tiles, theme-token surfaces, editor improvements and more translations.
