@@ -36,8 +36,9 @@
 		toggleMediaPlayback
 	} from '$lib/core/domains/mediaPlayer';
 	import Icon from './Icon.svelte';
+	import CloseButton from './CloseButton.svelte';
 
-	let { entity }: { entity: string } = $props();
+	let { entity, name }: { entity: string; name: string } = $props();
 
 	const FEATURE = {
 		pause: 1,
@@ -179,7 +180,7 @@
 	let volume = $derived(mediaVolumeForEntity(entity, player, $controlOverrides));
 </script>
 
-<div class="sheet" onclick={(event) => event.stopPropagation()} role="presentation">
+<div class="sheet" role="dialog" aria-modal="true" aria-label={name}>
 	{#if attributes.entity_picture}
 		<img class="art" src={attributes.entity_picture} alt="" />
 	{:else}
@@ -291,7 +292,7 @@
 							: pane === 'library'
 								? 'hearth_library'
 								: 'hearth_play_on'
-				).toUpperCase()}
+				)}
 			</div>
 			<div class="panel-list">
 				{#if pane === 'queue'}
@@ -349,14 +350,14 @@
 					{/if}
 				{:else if pane === 'library'}
 					<div class="library-kinds">
-						{#each ['albums', 'tracks', 'artists'] as kind (kind)}
+						{#each [['albums', 'hearth_albums'], ['tracks', 'hearth_tracks'], ['artists', 'hearth_artists']] as [kind, label] (kind)}
 							<button
 								type="button"
 								class="kind-chip"
 								class:active={libraryKind === kind}
 								onclick={() => loadLibrary(kind as LibraryKind)}
 							>
-								{$lang(`hearth_${kind}`)}
+								{$lang(label)}
 							</button>
 						{/each}
 					</div>
@@ -441,7 +442,7 @@
 						onkeydown={(event) => activateOnKeyboard(event, openPlaylists)}
 					>
 						<Icon name="queue_music" size={ICON.inline} />
-						{$lang('playlists')}
+						{$lang('hearth_playlists')}
 					</div>
 					<div
 						class="chip pressable"
@@ -473,14 +474,8 @@
 		</div>
 	</div>
 
-	<span
-		class="close pressable"
-		onclick={closePopup}
-		role="button"
-		tabindex="0"
-		onkeydown={(event) => activateOnKeyboard(event, closePopup)}
-	>
-		<Icon name="close" size={ICON.tile} />
+	<span class="close">
+		<CloseButton tone="art" onclick={closePopup} />
 	</span>
 </div>
 
@@ -492,7 +487,7 @@
 		position: relative;
 		overflow: hidden;
 		border: 1px solid rgb(var(--h-accent-rgb) / calc(0.18 * var(--h-accent-scale)));
-		box-shadow: 0 40px 100px var(--h-scrim);
+		box-shadow: var(--h-shadow-layer);
 		color: var(--h-on-art-1);
 	}
 
@@ -665,6 +660,7 @@
 		font-family: var(--h-font-mono);
 		font-size: var(--h-type-label);
 		letter-spacing: 2px;
+		text-transform: uppercase;
 		color: var(--h-on-art-3);
 		padding: 0 8px 8px;
 	}
@@ -885,16 +881,19 @@
 		text-overflow: ellipsis;
 	}
 
+	/* the 44px target is centred where the bare icon used to sit */
 	.close {
 		position: absolute;
-		top: 22px;
-		right: 24px;
-		color: var(--h-on-art-2);
-		cursor: pointer;
+		top: 12px;
+		right: 14px;
 	}
-	@media (max-width: 700px) {
+	/* see breakpoints.ts */
+	@media (max-width: 900px) {
 		.sheet {
-			width: 100%;
+			/* the margins keep a landscape cutout off the art and the controls */
+			width: calc(100% - env(safe-area-inset-left) - env(safe-area-inset-right));
+			margin-left: env(safe-area-inset-left);
+			margin-right: env(safe-area-inset-right);
 			height: min(560px, calc(100dvh - 24px));
 			border-radius: var(--h-radius-xl) var(--h-radius-xl) 0 0;
 			align-self: flex-end;

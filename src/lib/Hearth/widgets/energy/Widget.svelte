@@ -6,6 +6,7 @@
 	import type { RailWidget } from '../../config';
 	import { fetchStatistics, startDataRefresh } from '$lib/core/ha/history';
 	import { sensorNumber } from '$lib/core/ha/entities';
+	import { openEntityDetail } from '$lib/Hearth/details';
 	import Icon from '../../Icon.svelte';
 	import StripChip from '../StripChip.svelte';
 	import { kwhFactor } from './units';
@@ -16,6 +17,9 @@
 	}: { widget: Extract<RailWidget, { type: 'energy' }>; compact?: boolean } = $props();
 
 	let selectedEntity = $derived(entityState(widget.entity));
+
+	// a long-term statistic id need not be an entity; only an entity has a detail sheet
+	let openable = $derived(!!widget.entity && !!$selectedEntity);
 
 	const BAR_COUNT = 8;
 	// kWh per hour for today, oldest first; null until the first fetch lands
@@ -84,53 +88,73 @@
 	});
 </script>
 
+{#snippet content()}
+	<div class="header">
+		<Icon name="bolt" size={ICON.control} color="rgb(var(--h-accent-rgb))" fill />
+		<span class="title">{$lang('hearth_energy')}</span>
+		<span class="reading">
+			{#if total !== null}
+				<span class="value">{total.toFixed(1)} kWh</span>
+				{#if cost}
+					<span class="cost">· {cost}</span>
+				{/if}
+			{:else}
+				<span class="cost">-</span>
+			{/if}
+		</span>
+	</div>
+	{#if bars.length}
+		<div class="bars">
+			{#each bars as bar, index (index)}
+				<span
+					class="bar"
+					style:height="{bar.height}px"
+					style:background={bar.current
+						? 'rgb(var(--h-accent-rgb))'
+						: `rgb(var(--h-accent-rgb) / calc(${bar.alpha} * var(--h-accent-scale)))`}
+				></span>
+			{/each}
+		</div>
+	{/if}
+{/snippet}
 {#if compact}
 	{#if total !== null}
-		<StripChip icon="bolt" iconColor="rgb(var(--h-accent-rgb))" fill label={$lang('hearth_energy')}>
+		<StripChip
+			icon="bolt"
+			iconColor="rgb(var(--h-accent-rgb))"
+			fill
+			label={$lang('hearth_energy')}
+			onclick={openable ? () => openEntityDetail(widget.entity!) : undefined}
+		>
 			{total.toFixed(1)} kWh{cost ? ` · ${cost}` : ''}
 		</StripChip>
 	{/if}
+{:else if openable}
+	<button type="button" class="card pressable" onclick={() => openEntityDetail(widget.entity!)}>
+		{@render content()}
+	</button>
 {:else}
-	<div class="card">
-		<div class="header">
-			<Icon name="bolt" size={ICON.control} color="rgb(var(--h-accent-rgb))" fill />
-			<span class="title">{$lang('hearth_energy')}</span>
-			<span class="reading">
-				{#if total !== null}
-					<span class="value">{total.toFixed(1)} kWh</span>
-					{#if cost}
-						<span class="cost">· {cost}</span>
-					{/if}
-				{:else}
-					<span class="cost">-</span>
-				{/if}
-			</span>
-		</div>
-		{#if bars.length}
-			<div class="bars">
-				{#each bars as bar, index (index)}
-					<span
-						class="bar"
-						style:height="{bar.height}px"
-						style:background={bar.current
-							? 'rgb(var(--h-accent-rgb))'
-							: `rgb(var(--h-accent-rgb) / ${bar.alpha})`}
-					></span>
-				{/each}
-			</div>
-		{/if}
-	</div>
+	<div class="card">{@render content()}</div>
 {/if}
 
 <style>
 	.card {
-		padding: 12px 14px;
-		border-radius: var(--h-radius-md);
+		padding: var(--h-card-padding);
+		border-radius: var(--h-radius-card);
 		background: rgb(var(--h-surface-rgb) / calc(0.045 * var(--h-fill-scale)));
 		backdrop-filter: var(--h-surface-blur);
 		box-shadow: var(--h-card-shadow);
 		border: 1px solid rgb(var(--h-line-rgb) / calc(0.07 * var(--h-line-scale)));
 		margin-bottom: 8px;
+		display: block;
+		width: 100%;
+		font: inherit;
+		color: inherit;
+		text-align: left;
+	}
+
+	button.card {
+		cursor: pointer;
 	}
 
 	.header {

@@ -3,6 +3,7 @@
 	import { entityState } from '$lib/core/ha/entities';
 	import { callEntityService } from '$lib/core/ha/commands';
 	import { timer } from '$lib/core/app/clock';
+	import { pressFeedback } from '../pressFeedback';
 
 	let { entity }: { entity: string } = $props();
 
@@ -38,6 +39,7 @@
 	<button
 		type="button"
 		class="segment"
+		use:pressFeedback={entity}
 		class:active={timerState === 'active'}
 		disabled={!durationValid}
 		onclick={() =>
@@ -48,6 +50,7 @@
 	<button
 		type="button"
 		class="segment"
+		use:pressFeedback={entity}
 		disabled={timerState !== 'active'}
 		onclick={() => callEntityService('timer', 'pause', entity)}
 	>
@@ -56,6 +59,7 @@
 	<button
 		type="button"
 		class="segment"
+		use:pressFeedback={entity}
 		disabled={timerState === 'idle'}
 		onclick={() => callEntityService('timer', 'cancel', entity)}
 	>
@@ -64,6 +68,7 @@
 	<button
 		type="button"
 		class="segment"
+		use:pressFeedback={entity}
 		disabled={timerState === 'idle'}
 		onclick={() => callEntityService('timer', 'finish', entity)}
 	>

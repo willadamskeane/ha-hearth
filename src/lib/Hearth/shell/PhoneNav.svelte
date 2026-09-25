@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { lang } from '$lib/core/i18n';
+	import { motion } from '$lib/core/app/motion';
 	import { ICON } from '../iconSizes';
+	import { entityStates } from '$lib/core/ha/entities';
 	import {
 		currentRoom,
 		enterEditMode,
@@ -8,6 +10,7 @@
 		hearthEditMode,
 		hearthLoadError
 	} from '../store';
+	import { searchAvailable, visibilityEntityIds } from '../visibility';
 	import Icon from '../Icon.svelte';
 	import { hasStripWidgets } from '../widgets';
 
@@ -19,12 +22,41 @@
 	 * would sit over page content once the rail folds away, unless the status
 	 * strip is there to take it.
 	 */
-	let { onsearch, hideEditToggle = false }: { onsearch: () => void; hideEditToggle?: boolean } =
-		$props();
+	let {
+		onsearch,
+		hideEditToggle = false,
+		stripShown = undefined
+	}: {
+		onsearch: () => void;
+		hideEditToggle?: boolean;
+		/** Whether the status strip is drawn and carries the edit toggle; defaults to whether the rail has strip widgets. */
+		stripShown?: boolean;
+	} = $props();
 
-	let hasSearch = $derived(
-		$hearthConfig.rail.some((widget) => widget.type === 'search' && widget.hide_mobile !== true)
+	let editInStrip = $derived(stripShown ?? hasStripWidgets($hearthConfig.rail));
+
+	// the rail's own search widget is hidden here, so this button stands in for
+	// it - unless that widget is hidden on mobile or by its visibility conditions
+	// only the search widgets' condition entities, so an unrelated state
+	// update does not re-evaluate the switcher
+	let searchStates = $derived(
+		entityStates(
+			$hearthConfig.rail
+				.filter((widget) => widget.type === 'search')
+				.flatMap((widget) => visibilityEntityIds(widget.visibility))
+		)
 	);
+	let hasSearch = $derived(searchAvailable($hearthConfig.rail, $searchStates, true));
+
+	// a page picked from search or a ?room= link can sit past the strip's edge
+	let pills: Record<string, HTMLButtonElement | undefined> = {};
+	$effect(() => {
+		pills[$currentRoom]?.scrollIntoView?.({
+			inline: 'nearest',
+			block: 'nearest',
+			behavior: $motion ? 'smooth' : 'auto'
+		});
+	});
 </script>
 
 <nav class="phone-nav" aria-label={$lang('hearth_pages')}>
@@ -35,6 +67,7 @@
 				class="page pressable"
 				class:active={$currentRoom === room.id}
 				aria-current={$currentRoom === room.id ? 'page' : undefined}
+				bind:this={pills[room.id]}
 				onclick={() => currentRoom.set(room.id)}
 			>
 				<Icon name={room.icon} size={ICON.inline} />
@@ -47,7 +80,7 @@
 			<Icon name="search" size={ICON.control} />
 		</button>
 	{/if}
-	{#if !hideEditToggle && !$hearthLoadError && !$hearthEditMode && !hasStripWidgets($hearthConfig.rail)}
+	{#if !hideEditToggle && !$hearthLoadError && !$hearthEditMode && !editInStrip}
 		<button
 			type="button"
 			class="edit pressable"
@@ -64,6 +97,7 @@
 		display: none;
 	}
 
+	/* see breakpoints.ts */
 	@media (max-width: 900px) {
 		.phone-nav {
 			min-width: 0;
@@ -73,13 +107,18 @@
 			display: flex;
 			align-items: center;
 			gap: 8px;
-			/* the nav owns its inset: it bleeds past the layout's edge padding so
-			   the sticky gradient reaches the screen, and the pills keep their own
-			   12px instead of inheriting the container padding, which would push
-			   tabs off the strip on narrow screens */
-			margin: 0 calc(-1 * var(--h-pad-x));
-			padding: 8px 12px;
-			background: linear-gradient(180deg, var(--h-bg-1) 70%, transparent);
+			/* back out to the screen edge, past whatever padding the folded
+			   layout set - including the landscape notch inset */
+			margin: 0 calc(-1 * var(--h-fold-pad-right, var(--h-pad-x))) 0
+				calc(-1 * var(--h-fold-pad-left, var(--h-pad-x)));
+			/* the layout leaves no room above the strip, so the top inset is the
+			   strip's to carry; the sides match the layout's own padding so the
+			   pills line up with the cards under them */
+			padding: calc(8px + env(safe-area-inset-top)) var(--h-fold-pad-right, var(--h-pad-x)) 8px
+				var(--h-fold-pad-left, var(--h-pad-x));
+			/* opaque: the page passing behind a translucent strip shows through
+			   the pills, which reads as a smudge */
+			background: var(--h-bg-1);
 		}
 
 		.pages {
@@ -100,6 +139,7 @@
 		.search,
 		.edit {
 			flex: none;
+			position: relative;
 			display: flex;
 			align-items: center;
 			gap: 8px;
@@ -127,6 +167,29 @@
 			background: rgb(var(--h-accent-rgb) / calc(0.16 * var(--h-accent-scale)));
 			border-color: rgb(var(--h-accent-rgb) / calc(0.4 * var(--h-accent-scale)));
 			color: var(--h-accent-text);
+		}
+	}
+
+	/*
+	 * A phone held sideways: the strip would take a sixth of the screen. Only
+	 * the page being viewed keeps its label; the rest shrink to their icon and
+	 * hand the name to assistive technology instead of dropping it. See
+	 * breakpoints.ts.
+	 */
+	@media (max-width: 900px) and (max-height: 500px) and (orientation: landscape) {
+		.page:not(.active) {
+			width: 44px;
+			padding: 0;
+			justify-content: center;
+		}
+
+		.page:not(.active) span {
+			position: absolute;
+			width: 1px;
+			height: 1px;
+			overflow: hidden;
+			clip-path: inset(50%);
+			white-space: nowrap;
 		}
 	}
 </style>

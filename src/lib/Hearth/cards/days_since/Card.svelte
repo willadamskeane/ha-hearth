@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { ICON } from '../../iconSizes';
 	import Ripple from '$lib/ui/actions/ripple';
-	import { lang } from '$lib/core/i18n';
+	import { lang, fill } from '$lib/core/i18n';
 	import { timer } from '$lib/core/app/clock';
 	import { entityAvailable, entityState } from '$lib/core/ha/entities';
 	import { calendarDaysBetween, parseLocalDate } from '$lib/core/i18n/time';
@@ -34,7 +34,7 @@
 				? $lang('hearth_today')
 				: days === 1
 					? $lang('hearth_yesterday')
-					: `${days} ${$lang('hearth_days')}`
+					: fill($lang('hearth_days'), { count: days })
 	);
 
 	function reset() {
@@ -77,8 +77,8 @@
 		display: flex;
 		align-items: center;
 		gap: 14px;
-		padding: 16px 16px;
-		border-radius: var(--h-radius-md);
+		padding: var(--h-card-padding);
+		border-radius: var(--h-radius-card);
 		background: rgb(var(--h-surface-rgb) / calc(0.045 * var(--h-fill-scale)));
 		backdrop-filter: var(--h-surface-blur);
 		border: 1px solid rgb(var(--h-line-rgb) / calc(0.06 * var(--h-line-scale)));

@@ -2,15 +2,23 @@
 	import { lang } from '$lib/core/i18n';
 	import { entityState } from '$lib/core/ha/entities';
 	import type { VerdictBands } from '$lib/core/domains/sensor';
-	import { hearthEditMode, popup } from './store';
+	import { hearthEditMode } from './store';
+	import { formatReading } from './format';
+	import { openEntityDetail } from './details';
 	import { airQualityVerdict } from '$lib/core/domains/sensor';
 	import { entityAvailability, sensorNumber } from '$lib/core/ha/entities';
 
 	let {
 		entity,
 		name = undefined,
-		verdictBands = undefined
-	}: { entity: string; name?: string; verdictBands?: false | VerdictBands } = $props();
+		verdictBands = undefined,
+		readonly = false
+	}: {
+		entity: string;
+		name?: string;
+		verdictBands?: false | VerdictBands;
+		readonly?: boolean;
+	} = $props();
 
 	let selectedEntity = $derived(entityState(entity));
 	let stateObj = $derived($selectedEntity);
@@ -28,16 +36,16 @@
 					? $lang('hearth_missing_entity')
 					: $lang(availability)
 				: (stateObj?.state ?? '')
-			: value % 1 === 0
-				? String(value)
-				: value.toFixed(1)
+			: formatReading(value)
 	);
 
-	// a numeric readout earns a tap: its 24h history in a popup
+	// a numeric readout earns a tap: its detail sheet with the 24h history.
+	// The sheet of a writable entity (input_number) has controls, which read
+	// only removes
 	let openable = $derived(value !== null && !$hearthEditMode);
 
 	function openHistory() {
-		if (openable) popup.set({ kind: 'sensor', entity, name: label });
+		if (openable) openEntityDetail(entity, name, { readonly });
 	}
 </script>
 

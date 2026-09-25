@@ -2,7 +2,7 @@
 	import { ICON } from '../../iconSizes';
 	import Ripple from '$lib/ui/actions/ripple';
 	import { connected } from '$lib/core/ha/connection';
-	import { lang, selectedLanguage } from '$lib/core/i18n';
+	import { lang, fill, selectedLanguage } from '$lib/core/i18n';
 	import { dateKey, dateTimeFormat, parseLocalDate } from '$lib/core/i18n/time';
 	import { timer } from '$lib/core/app/clock';
 	import { entityState } from '$lib/core/ha/entities';
@@ -102,7 +102,7 @@
 		const travelMinutes = widget.travel_entity ? sensorNumber($selectedTravel?.state) : null;
 		if (travelMinutes !== null) {
 			const leave = new Date(next.start.getTime() - travelMinutes * 60_000);
-			line += ` · ${$lang('hearth_leave_by')} ${clockTime(leave)}`;
+			line += ` · ${fill($lang('hearth_leave_by'), { time: clockTime(leave) })}`;
 		}
 		return line;
 	});
@@ -119,27 +119,23 @@
 			{next.title}{timeLine ? ` · ${timeLine}` : ''}
 		</StripChip>
 	{/if}
-{:else}
-	{#if next || $hearthEditMode}
-		<div class="row" class:inactive={!next}>
-			<Icon name="event" size={ICON.control} color="var(--h-icon)" />
-			<div class="body">
-				<div class="title">{next?.title ?? $lang('hearth_no_upcoming_events')}</div>
-				{#if timeLine}
-					<div class="time">{timeLine}</div>
-				{/if}
-			</div>
-			<button
-				type="button"
-				class="chevron pressable"
-				aria-label={$lang('calendar')}
-				use:Ripple={PRESS_RIPPLE}
-				onclick={openCalendar}
-			>
-				<Icon name="chevron_right" size={ICON.control} color="var(--h-icon)" />
-			</button>
+{:else if next || $hearthEditMode}
+	<button
+		type="button"
+		class="row pressable"
+		class:inactive={!next}
+		use:Ripple={PRESS_RIPPLE}
+		onclick={openCalendar}
+	>
+		<Icon name="event" size={ICON.control} color="var(--h-icon)" />
+		<div class="body">
+			<div class="title">{next?.title ?? $lang('hearth_no_upcoming_events')}</div>
+			{#if timeLine}
+				<div class="time">{timeLine}</div>
+			{/if}
 		</div>
-	{/if}
+		<Icon name="chevron_right" size={ICON.control} color="var(--h-icon)" />
+	</button>
 {/if}
 
 <style>
@@ -147,6 +143,7 @@
 		display: flex;
 		align-items: center;
 		gap: 12px;
+		width: 100%;
 		padding: 10px 10px 10px 14px;
 		border-radius: var(--h-radius-sm);
 		background: rgb(var(--h-surface-rgb) / calc(0.045 * var(--h-fill-scale)));
@@ -154,6 +151,9 @@
 		box-shadow: var(--h-card-shadow);
 		border: 1px solid rgb(var(--h-line-rgb) / calc(0.07 * var(--h-line-scale)));
 		margin-bottom: 8px;
+		font: inherit;
+		text-align: left;
+		cursor: pointer;
 	}
 
 	.row.inactive {
@@ -178,18 +178,5 @@
 		font-size: var(--h-type-small);
 		color: var(--h-text-5);
 		margin-top: 2px;
-	}
-
-	.chevron {
-		display: grid;
-		place-items: center;
-		width: 44px;
-		height: 44px;
-		margin: -10px -6px -10px 0;
-		padding: 0;
-		border-radius: 50%;
-		cursor: pointer;
-		border: 0;
-		background: none;
 	}
 </style>

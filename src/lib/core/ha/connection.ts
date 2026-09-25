@@ -94,16 +94,54 @@ function isIngressPage(configuration: Configuration) {
 	return configuration.ingress === true || location.pathname.startsWith('/api/hassio_ingress/');
 }
 
-export interface ConnectionHooks {
-	/**
-	 * Called once when the companion app needs a long-lived token; the auth
-	 * redirect flow does not work there. The caller shows whatever prompt it
-	 * has; authentication keeps failing until the configuration carries a token.
-	 */
-	onTokenRequired?: () => void;
-}
+/**
+ * True while only a new long-lived token can get past authentication: the
+ * companion app, where the auth redirect flow does not work, or a configured
+ * token that Home Assistant rejects. Cleared once a connection succeeds.
+ */
+export const tokenNeeded = writable(false);
 
-let tokenPromptShown = false;
+/**
+ * Why the latest attempt failed, cleared when a new run starts or a connection
+ * succeeds. invalid_auth covers a rejected token and a failed OAuth exchange;
+ * panel_auth is the HA app iframe still waiting for its parent session.
+ */
+export type ConnectionError =
+	'cannot_connect' | 'https_to_http' | 'invalid_auth' | 'panel_auth' | 'unknown';
+export const connectionError = writable<ConnectionError | undefined>();
+
+/** Failed attempts in a row for the current run; reset when it starts or succeeds. */
+export const failedAttempts = writable(0);
+
+const PANEL_AUTH_PENDING = 'Waiting for Home Assistant panel authentication';
+
+/**
+ * HA's /app/<slug> panel embeds this page in a same-origin iframe and exposes
+ * the already-authenticated frontend session as window.parent.hassConnection.
+ * Reusing that access token skips OAuth, which cannot complete inside the iframe
+ * (HA's authorize page reports Invalid redirect URI).
+ */
+async function accessTokenFromParentHass(): Promise<string | undefined> {
+	if (typeof window === 'undefined' || window.parent === window) return;
+	try {
+		const pending = (
+			window.parent as Window & {
+				hassConnection?: Promise<{ auth?: { data?: { access_token?: string } } }>;
+			}
+		).hassConnection;
+		if (!pending) return;
+		const session = await Promise.race([
+			pending,
+			new Promise<undefined>((resolve) => {
+				setTimeout(() => resolve(undefined), 2000);
+			})
+		]);
+		const token = session?.auth?.data?.access_token;
+		return typeof token === 'string' && token.length > 0 ? token : undefined;
+	} catch {
+		return;
+	}
+}
 
 function trackSubscription(subscription: Promise<unknown>, channel: string) {
 	void subscription.catch((error) => {
@@ -114,7 +152,6 @@ function trackSubscription(subscription: Promise<unknown>, channel: string) {
 
 export async function authentication(
 	configuration: Configuration,
-	hooks: ConnectionHooks = {},
 	/** False once a newer startConnection took over; the result is then discarded. */
 	isCurrent: () => boolean = () => true
 ) {
@@ -127,42 +164,57 @@ export async function authentication(
 	let activeTokenStorage = hearthTokenStorage;
 
 	try {
+		const hassUrl = new URL(configuration.hassUrl, location.origin).href.replace(/\/$/, '');
 		if (configuration.serverAuth) {
 			// The direct add-on route replaces this placeholder in its trusted,
 			// server-side WebSocket bridge. No Home Assistant credential reaches
 			// browser storage or JavaScript.
-			auth = createLongLivedTokenAuth(window.location.origin, 'hearth-server-proxy');
+			auth = createLongLivedTokenAuth(location.origin, 'hearth-server-proxy');
 		} else if (configuration?.token) {
-			auth = createLongLivedTokenAuth(configuration.hassUrl, configuration.token);
-		} else if (navigator.userAgent.includes('Home Assistant')) {
-			// the companion app requires token authentication
-			if (!tokenPromptShown) {
-				tokenPromptShown = true;
-				hooks.onTokenRequired?.();
-			}
-			health.set('lost');
-			// not a successful authentication: callers must keep retrying until
-			// the configuration supplies a long-lived token
-			throw new Error('A long-lived access token is required in the companion app');
+			auth = createLongLivedTokenAuth(hassUrl, configuration.token);
 		} else {
 			const ingress = isIngressPage(configuration);
-			activeTokenStorage = ingress ? ingressTokenStorage : hearthTokenStorage;
-			if (ingress && !(await activeTokenStorage.loadTokens())) {
-				throw new Error('The Home Assistant browser session is unavailable to Ingress');
+			if (ingress && (await ingressTokenStorage.loadTokens())) {
+				// Ingress runs inside the authenticated Home Assistant frontend. The
+				// browser-facing origin can differ from the origin Supervisor forwards to
+				// the add-on (for example Kiosk Satellite's secure-context proxy). Use the
+				// actual frontend origin so getAuth accepts the shared hassTokens record and
+				// opens its WebSocket through the same proxy instead of starting OAuth in
+				// the iframe.
+				activeTokenStorage = ingressTokenStorage;
+				auth = await getAuth({ ...activeTokenStorage, hassUrl: location.origin });
+				if (auth.expired) await auth.refreshAccessToken();
+			} else {
+				const parentToken = await accessTokenFromParentHass();
+				if (parentToken) {
+					auth = createLongLivedTokenAuth(ingress ? location.origin : hassUrl, parentToken);
+				} else if (navigator.userAgent.includes('Home Assistant')) {
+					tokenNeeded.set(true);
+					health.set('lost');
+					// not a successful authentication: callers must keep retrying until
+					// the configuration supplies a long-lived token
+					throw new Error('A long-lived access token is required in the companion app');
+				} else if (window.parent !== window) {
+					// HA app / Ingress iframe without a parent session yet. Retry until
+					// the panel session is ready. OAuth in this frame is rejected with
+					// Invalid redirect URI.
+					health.set('lost');
+					throw new Error(PANEL_AUTH_PENDING);
+				} else {
+					// Return the OAuth callback to the exact page that started it,
+					// including an Ingress path. Strip the query string; the library
+					// appends auth_callback itself, and Ingress does not reliably
+					// round-trip extra search params.
+					auth = await getAuth({
+						...activeTokenStorage,
+						hassUrl,
+						limitHassInstance: true,
+						redirectUrl: `${location.origin}${location.pathname}`
+					});
+					clearAuthCallback();
+					if (auth.expired) await auth.refreshAccessToken();
+				}
 			}
-			// Ingress runs inside the authenticated Home Assistant frontend. The
-			// browser-facing origin can differ from the origin Supervisor forwards to
-			// the add-on (for example Kiosk Satellite's secure-context proxy). Use the
-			// actual frontend origin so getAuth accepts the shared hassTokens record and
-			// opens its WebSocket through the same proxy instead of starting OAuth in
-			// the iframe.
-			const hassUrl = ingress ? window.location.origin : configuration.hassUrl;
-			auth = await getAuth({
-				...activeTokenStorage,
-				hassUrl,
-				...(ingress ? {} : { redirectUrl: `${window.location.origin}${window.location.pathname}` })
-			});
-			if (auth.expired) await auth.refreshAccessToken();
 		}
 
 		const conn = await createConnection({ auth });
@@ -171,7 +223,9 @@ export async function authentication(
 			conn.close();
 			return;
 		}
-		tokenPromptShown = false;
+		tokenNeeded.set(false);
+		connectionError.set(undefined);
+		failedAttempts.set(0);
 		connection.set(conn);
 
 		// the lib fires "ready" inside the Connection constructor, before any
@@ -222,11 +276,6 @@ export async function authentication(
 			if (get(connection) === conn) health.set('lost');
 		});
 
-		// clear auth query string
-		if (location.search.includes('auth_callback=1')) {
-			history.replaceState(null, '', location.pathname);
-		}
-
 		trackSubscription(
 			conn.subscribeMessage(
 				(message: { variables?: { trigger?: { event?: { data?: { event?: unknown } } } } }) => {
@@ -275,15 +324,44 @@ export async function authentication(
 		);
 	} catch (error) {
 		if (!isCurrent()) return;
+		if (error === ERR_INVALID_AUTH && configuration.token && !configuration.serverAuth) {
+			tokenNeeded.set(true);
+		}
 		handleError(error, activeTokenStorage);
 	}
 }
 
+function clearAuthCallback() {
+	const url = new URL(location.href);
+	if (!url.searchParams.has('auth_callback')) return;
+	for (const key of ['auth_callback', 'code', 'state']) url.searchParams.delete(key);
+	history.replaceState(history.state, '', url.pathname + url.search + url.hash);
+}
+
+function errorCode(error: unknown): ConnectionError {
+	switch (error) {
+		case ERR_CANNOT_CONNECT:
+		case ERR_CONNECTION_LOST:
+			return 'cannot_connect';
+		case ERR_INVALID_HTTPS_TO_HTTP:
+			return 'https_to_http';
+		case ERR_INVALID_AUTH:
+		case ERR_INVALID_AUTH_CALLBACK:
+			return 'invalid_auth';
+		default:
+			return error instanceof Error && error.message === PANEL_AUTH_PENDING
+				? 'panel_auth'
+				: 'unknown';
+	}
+}
+
 function handleError(error: unknown, activeTokenStorage = hearthTokenStorage) {
+	connectionError.set(errorCode(error));
 	switch (error) {
 		case ERR_INVALID_AUTH:
 			console.error('ERR_INVALID_AUTH');
 			activeTokenStorage.clearTokens();
+			clearAuthCallback();
 			break;
 		case ERR_INVALID_AUTH_CALLBACK:
 			// raised by getAuth() when the auth callback state (client id /
@@ -291,9 +369,7 @@ function handleError(error: unknown, activeTokenStorage = hearthTokenStorage) {
 			// string so the next retry restarts the auth flow cleanly
 			console.error('ERR_INVALID_AUTH_CALLBACK');
 			activeTokenStorage.clearTokens();
-			if (location.search.includes('auth_callback=1')) {
-				history.replaceState(null, '', location.pathname);
-			}
+			clearAuthCallback();
 			break;
 		case ERR_CANNOT_CONNECT:
 			console.error('ERR_CANNOT_CONNECT');
@@ -308,6 +384,7 @@ function handleError(error: unknown, activeTokenStorage = hearthTokenStorage) {
 			console.error('ERR_INVALID_HTTPS_TO_HTTP');
 			break;
 		default:
+			if (error instanceof Error && error.message === PANEL_AUTH_PENDING) break;
 			console.error(error);
 	}
 	throw error;
@@ -327,21 +404,24 @@ let currentRun = 0;
 // releases the current connection's scope listener and entity subscription
 let stopEntityScope: (() => void) | undefined;
 
-export function startConnection(configuration: Configuration, hooks: ConnectionHooks = {}) {
+export function startConnection(configuration: Configuration) {
 	stopConnection();
+	connectionError.set(undefined);
+	failedAttempts.set(0);
 	const run = ++currentRun;
 	let connecting = false;
 	const attempt = async () => {
 		if (connecting || run !== currentRun) return;
 		connecting = true;
 		try {
-			await authentication(configuration, hooks, () => run === currentRun);
+			await authentication(configuration, () => run === currentRun);
 			if (run === currentRun) {
 				clearInterval(retryTimer);
 				retryTimer = undefined;
 			}
 		} catch {
 			// retried on the interval
+			if (run === currentRun) failedAttempts.update((count) => count + 1);
 		} finally {
 			connecting = false;
 		}

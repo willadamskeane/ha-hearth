@@ -10,7 +10,7 @@ Hearth is an early-stage project and is actively evolving.
 
 This is [Will Adams-Keane](https://github.com/willadamskeane)'s fork of [knowald/ha-hearth](https://github.com/knowald/ha-hearth). It exists to run Hearth well on a real wall tablet: a Lenovo ThinkSmart View, an Android 8 device with Chrome 138, that sits in a study, runs Hearth in the Kiosk Satellite app through Home Assistant Ingress, and doubles as a [Voice Satellite](https://github.com/jxlarrea/voice-satellite-card-integration). Stock Hearth struggled on that hardware in four ways: authentication inside Ingress, rendering cost on a slow GPU, a layout meant for wider screens, and touch handling on a scrolling wall of light tiles. The changes below were developed and checked on that device.
 
-It branched from upstream 0.1.0 on 2026-09-20. Its releases, 0.1.1 to 0.1.20, are numbered separately from upstream, which has since reached 0.3.0 with its own changes that aren't merged here. See [CHANGELOG.md](CHANGELOG.md) for the full list.
+It branched from upstream 0.1.0 on 2026-09-20. Its releases, 0.1.1 to 0.1.20, are numbered separately from upstream, which has since reached 0.3.0. Upstream's changes through 0.3.0 are merged into this fork; where both sides changed the same behaviour, the fork's is kept. See [CHANGELOG.md](CHANGELOG.md) for the full list.
 
 ### What's different
 
@@ -29,7 +29,7 @@ It branched from upstream 0.1.0 on 2026-09-20. Its releases, 0.1.1 to 0.1.20, ar
 
 **Narrow and tablet layout** (0.1.10–0.1.14)
 
-- On narrow screens the rail's glanceable widgets (clock, date, energy and so on) sit in a compact status strip at the top of the page, not at the bottom of every page.
+- On narrow screens the rail's glanceable widgets (clock, date, energy and so on) sit in a compact status strip at the top of the page, not at the bottom of every page. The remaining widgets follow upstream's folded rail, split above and below the page; a phone held sideways drops the strip and folds its widgets into the rail instead.
 - The room header is compact, and the edit toggle lives in the status strip instead of floating over page content.
 
 **Touch that doesn't fight scrolling** (0.1.18)
@@ -76,6 +76,10 @@ For a production Node deployment:
 pnpm build
 HASS_URL=http://homeassistant.local:8123 PORT=5050 node server.js
 ```
+
+`HASS_URL` is the server's Home Assistant proxy target. Browser authentication and WebSocket connections use the forwarded Home Assistant origin on Ingress (`X-Forwarded-Proto` and `X-Forwarded-Host`). For direct access they use `HASS_PUBLIC_URL` when set, otherwise `HASS_URL`. `PUBLIC_HASS_URL`, when set, overrides both, Ingress included.
+
+For standalone deployments where `HASS_URL` is internal (for example, `http://homeassistant:8123`), set `HASS_PUBLIC_URL` to a Home Assistant URL reachable by the browser. Use an HTTPS URL when Hearth is served over HTTPS. Docker Compose accepts the same setting in `.env.docker`.
 
 The first connection opens a setup wizard that proposes a dashboard using Home Assistant's areas, devices and entities. You can also start with an empty page and add cards and rail widgets yourself.
 
@@ -131,7 +135,7 @@ pnpm matrix
 
 Browser tests use a fake Home Assistant and fixture data. `pnpm matrix` generates screenshots and a review sheet. Actual device and live camera behavior also need testing against your installation.
 
-See [component conventions](src/lib/Hearth/README.md) and [releasing](docs/release.md). Changes use the `hearth` commit scope. Contributions are covered by the [MIT license](LICENSE); retained copyright notices apply to included code.
+See [component conventions](src/lib/Hearth/README.md) and [releasing](docs/release.md). The [changelog](CHANGELOG.md) follows [Common Changelog](https://common-changelog.org/). Changes use the `hearth` commit scope. Contributions are covered by the [MIT license](LICENSE); retained copyright notices apply to included code.
 
 ## Shoutout
 

@@ -74,7 +74,12 @@
 				</div>
 			{/if}
 			{#if (ref.display ?? style) === 'stat'}
-				<StatTile entity={ref.entity} name={ref.name} verdictBands={ref.verdict} />
+				<StatTile
+					entity={ref.entity}
+					name={ref.name}
+					verdictBands={ref.verdict}
+					readonly={ref.readonly ?? readonly}
+				/>
 			{:else}
 				<!-- lights and covers go straight to their tile rather than through
 				     EntityTile's own dispatch: one component per tile, not two -->

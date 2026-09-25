@@ -13,12 +13,15 @@
 	import { lang } from '$lib/core/i18n';
 	import { PRESS_RIPPLE } from '../config';
 	import Icon from '../Icon.svelte';
+	import CloseButton from '../CloseButton.svelte';
 	import { layer } from '$lib/ui/layers';
 	import { clampToViewport, windowDrag, type WindowPosition } from '$lib/ui/actions/windowDrag';
 	import ScrollEdge from '$lib/ui/ScrollEdge.svelte';
 	import { scrollEdges, type ScrollEdges } from '$lib/ui/actions/scrollEdges';
-	import { hearthConfig } from '../store';
+	import { hearthConfig, requestConfirmation } from '../store';
+	import { WIDE_QUERY } from '../breakpoints';
 	import './editor-fields.css';
+	import '../buttons.css';
 
 	let {
 		title,
@@ -27,13 +30,16 @@
 		onback,
 		ondone,
 		doneDisabled = false,
+		doneLabel = undefined,
 		onremove,
 		removeLabel = undefined,
+		removeTone = 'danger',
 		onmoveup,
 		onmovedown,
 		wide = false,
 		split = false,
-		floating = false
+		floating = false,
+		dismissible = true
 	}: {
 		title: string;
 		children: Snippet;
@@ -41,18 +47,20 @@
 		onback?: () => void;
 		ondone: () => void;
 		doneDisabled?: boolean;
+		doneLabel?: string;
 		onremove?: () => void;
 		removeLabel?: string;
+		/** A neutral remove action (one that destroys nothing) runs without asking. */
+		removeTone?: 'danger' | 'neutral';
 		onmoveup?: () => void;
 		onmovedown?: () => void;
 		wide?: boolean;
 		split?: boolean;
 		/** Drop the modal backdrop and let the sheet be dragged over the page. */
 		floating?: boolean;
+		/** False keeps a backdrop tap from closing the sheet; Escape and the close button still do. */
+		dismissible?: boolean;
 	} = $props();
-
-	let confirmRemove = $state(false);
-	let confirmTimer: ReturnType<typeof setTimeout>;
 
 	// long editor forms run off the sheet with no scrollbar to say so
 	let bodyCut = $state<ScrollEdges>({ top: false, bottom: false, left: false, right: false });
@@ -67,7 +75,7 @@
 
 	$effect(() => {
 		if (!floating || typeof window.matchMedia !== 'function') return;
-		const query = window.matchMedia('(min-width: 821px)');
+		const query = window.matchMedia(WIDE_QUERY);
 		const sync = () => (wideViewport = query.matches);
 		sync();
 		query.addEventListener('change', sync);
@@ -110,14 +118,29 @@
 		};
 	});
 
+	/*
+	 * A modal sheet takes focus and keeps Tab inside. A form field that asks
+	 * for focus with data-autofocus gets it; otherwise the done button does, so
+	 * opening an editor never raises an on-screen keyboard by itself.
+	 */
+	function initialFocus(node: HTMLElement) {
+		return (
+			node.querySelector<HTMLElement>('[data-autofocus]') ??
+			node.querySelector<HTMLElement>('.header .primary:not(:disabled)')
+		);
+	}
+
 	function handleRemove() {
-		clearTimeout(confirmTimer);
-		if (confirmRemove) {
+		if (removeTone === 'neutral') {
 			onremove?.();
 			return;
 		}
-		confirmRemove = true;
-		confirmTimer = setTimeout(() => (confirmRemove = false), 4000);
+		requestConfirmation({
+			title: $lang('hearth_remove_confirm_title'),
+			message: $lang('hearth_remove_confirm_message'),
+			confirmLabel: removeLabel ?? $lang('remove'),
+			action: () => onremove?.()
+		});
 	}
 </script>
 
@@ -127,8 +150,9 @@
 	class="overlay"
 	class:floating={floats}
 	role="presentation"
-	onpointerdown={(event) => !floats && event.target === event.currentTarget && onclose()}
-	use:layer={onclose}
+	onpointerdown={(event) =>
+		dismissible && !floats && event.target === event.currentTarget && onclose()}
+	use:layer={{ close: onclose, trap: !floats, initialFocus: !floating && initialFocus }}
 >
 	<div
 		class="sheet"
@@ -186,21 +210,14 @@
 			{/if}
 			<button
 				type="button"
-				class="button primary pressable"
+				class="hearth-button primary pressable"
 				disabled={doneDisabled}
 				use:Ripple={PRESS_RIPPLE}
 				onclick={() => !doneDisabled && ondone()}
 			>
-				{$lang('done')}
+				{doneLabel ?? $lang('done')}
 			</button>
-			<button
-				type="button"
-				class="icon-button"
-				aria-label={$lang('hearth_close')}
-				onclick={onclose}
-			>
-				<Icon name="close" size={ICON.tile} />
-			</button>
+			<CloseButton onclick={onclose} />
 		</div>
 		<div class="body-wrap">
 			<div class="body" class:split use:scrollEdges={{ report: (edges) => (bodyCut = edges) }}>
@@ -215,14 +232,13 @@
 			<div class="footer">
 				<button
 					type="button"
-					class="button danger pressable"
-					class:confirm={confirmRemove}
+					class="hearth-button pressable"
+					class:danger={removeTone === 'danger'}
+					class:secondary={removeTone === 'neutral'}
 					use:Ripple={PRESS_RIPPLE}
 					onclick={handleRemove}
 				>
-					{confirmRemove
-						? `${removeLabel ?? $lang('remove')} - ${$lang('hearth_are_you_sure')}`
-						: (removeLabel ?? $lang('remove'))}
+					{removeLabel ?? $lang('remove')}
 				</button>
 			</div>
 		{/if}
@@ -249,7 +265,7 @@
 		background: radial-gradient(680px 440px at 25% -10%, var(--h-sheet-0), var(--h-sheet-1) 60%);
 		border: 1px solid rgb(var(--h-line-rgb) / calc(0.08 * var(--h-line-scale)));
 		border-radius: var(--h-radius-xl);
-		box-shadow: 0 30px 80px var(--h-scrim);
+		box-shadow: var(--h-shadow-layer);
 		color: var(--h-text-1);
 		font-family: var(--h-font-ui);
 		overflow: hidden;
@@ -318,6 +334,7 @@
 		grid-template-columns: repeat(2, minmax(0, 1fr));
 		align-content: start;
 		column-gap: 18px;
+		overflow-x: hidden;
 		overflow-y: auto;
 		scrollbar-gutter: stable;
 		padding: 22px 28px 28px;
@@ -345,6 +362,7 @@
 	.body > :global(.visibility-row),
 	.body > :global(.add-row),
 	.body > :global(.hint),
+	.body > :global(.field-hint),
 	.body > :global(.error),
 	.body > :global(.advanced-toggle),
 	.body > :global(.elements-editor),
@@ -354,7 +372,8 @@
 	.body > :global(.picker-grid),
 	.body > :global(.reset),
 	.body > :global(.settings),
-	.body > :global(.yaml-field),
+	.body > :global(.code-field),
+	.body > :global(.versions-layout),
 	.body > :global(.code-workspace),
 	.body > :global(.card-editor-layout) {
 		grid-column: 1 / -1;
@@ -366,37 +385,6 @@
 		padding: 14px 28px 18px;
 		border-top: 1px solid rgb(var(--h-line-rgb) / calc(0.06 * var(--h-line-scale)));
 		flex: none;
-	}
-
-	.button {
-		border: 1px solid transparent;
-		padding: 12px 22px;
-		border-radius: var(--h-radius-xs);
-		font-size: var(--h-type-body);
-		font-weight: 600;
-		cursor: pointer;
-		user-select: none;
-		-webkit-user-select: none;
-		font-family: inherit;
-	}
-
-	.button.primary {
-		background: linear-gradient(135deg, var(--h-accent-deep), var(--h-accent-bright));
-		color: var(--h-on-accent);
-	}
-
-	.button.primary:disabled {
-		opacity: 0.4;
-		cursor: default;
-	}
-
-	.button.danger {
-		background: rgb(var(--h-bad-rgb) / calc(0.16 * var(--h-accent-scale)));
-		color: var(--h-bad-text);
-	}
-
-	.button.danger.confirm {
-		border-color: var(--h-bad-text);
 	}
 
 	/* the page keeps the pointer; only the window itself takes it back */
@@ -428,7 +416,7 @@
 	}
 
 	.sheet.floating .body {
-		grid-template-columns: 1fr;
+		grid-template-columns: minmax(0, 1fr);
 		padding: 18px 20px 24px;
 	}
 
@@ -444,10 +432,12 @@
 		cursor: grabbing;
 	}
 
-	@media (max-width: 820px) {
+	/* see breakpoints.ts */
+	@media (max-width: 900px) {
 		.overlay {
 			align-items: stretch;
-			padding: 8px;
+			/* a landscape cutout overlaps the edge a full-width sheet reaches to */
+			padding: 8px calc(8px + env(safe-area-inset-right)) 8px calc(8px + env(safe-area-inset-left));
 		}
 
 		.sheet {
@@ -465,7 +455,7 @@
 		}
 
 		.body {
-			grid-template-columns: 1fr;
+			grid-template-columns: minmax(0, 1fr);
 			padding: 18px;
 		}
 

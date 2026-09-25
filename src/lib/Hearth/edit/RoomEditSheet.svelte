@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { integerFromInput } from './numbers';
-	import { lang } from '$lib/core/i18n';
+	import { fill, lang } from '$lib/core/i18n';
 	import { get } from 'svelte/store';
 	import { moveItem, resizeCardColumns, slugify, uniqueId } from '../config';
 	import { currentRoom, editor, hearthConfig, updateConfig } from '../store';
@@ -102,9 +102,17 @@
 	onmoveup={id ? () => move(-1) : undefined}
 	onmovedown={id ? () => move(1) : undefined}
 >
-	<TextField label={$lang('name')} bind:value={name} placeholder="Living Room" />
+	<TextField
+		label={$lang('name')}
+		bind:value={name}
+		placeholder={$lang('hearth_example_page_name')}
+	/>
 	<IconField label={$lang('icon')} bind:value={icon} placeholder="meeting_room" />
-	<TextField label={$lang('summary')} bind:value={summary} placeholder="Cozy · curtains open" />
+	<TextField
+		label={$lang('summary')}
+		bind:value={summary}
+		placeholder={$lang('hearth_example_page_summary')}
+	/>
 	<EntityField
 		label={$lang('hearth_temperature_sensor')}
 		bind:value={tempEntity}
@@ -122,20 +130,16 @@
 			{ value: 'scroll', label: $lang('hearth_scrollable_default') },
 			{ value: 'fill', label: $lang('hearth_fill_the_screen') }
 		]}
+		hint={fillScreen === 'fill' ? $lang('hearth_media_and_sensor_cards_without_a') : undefined}
 	/>
-	{#if fillScreen === 'fill'}
-		<div class="hint">
-			{$lang('hearth_media_and_sensor_cards_without_a')}
-		</div>
-	{/if}
 	<SelectField
 		label={$lang('hearth_page_columns')}
 		bind:value={columns}
 		options={[
-			{ value: '', label: 'Auto' },
-			{ value: '1', label: '1 column' },
-			{ value: '2', label: '2 columns' },
-			{ value: '3', label: '3 columns' }
+			{ value: '', label: $lang('auto') },
+			{ value: '1', label: $lang('hearth_one_column') },
+			{ value: '2', label: fill($lang('hearth_columns_count'), { count: 2 }) },
+			{ value: '3', label: fill($lang('hearth_columns_count'), { count: 3 }) }
 		]}
 	/>
 
@@ -143,7 +147,7 @@
 		<input type="checkbox" bind:checked={hideHeader} />
 		<span>{$lang('hearth_hide_page_header')}</span>
 	</label>
-	<div class="hint">
+	<div class="field-hint">
 		{$lang('hearth_everything_on_the_page_is_a')}
 		{#if id && $hearthConfig.rooms.length === 1}
 			{$lang('hearth_this_is_the_last_page_so')}
@@ -152,12 +156,6 @@
 </EditSheet>
 
 <style>
-	.hint {
-		font-size: var(--h-type-small);
-		color: var(--h-text-6);
-		margin: 6px 0 2px;
-	}
-
 	.check {
 		display: flex;
 		align-items: center;

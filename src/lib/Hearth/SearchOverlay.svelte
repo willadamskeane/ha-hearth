@@ -9,6 +9,7 @@
 	import { currentRoom, hearthConfig } from './store';
 	import { openEntityDetail } from '$lib/Hearth/details';
 	import Icon from './Icon.svelte';
+	import CloseButton from './CloseButton.svelte';
 	import { layer } from '$lib/ui/layers';
 
 	let { onclose }: { onclose: () => void } = $props();
@@ -18,6 +19,9 @@
 	let query = $state('');
 	let activeIndex = $state(0);
 	let rowEls: (HTMLButtonElement | undefined)[] = [];
+	// closing on pointerdown would let the click land on the tile underneath,
+	// and a drag out of the panel must not count as a backdrop tap
+	let pressStartedOnBackdrop = false;
 
 	type Result =
 		| { kind: 'room'; id: string; name: string; icon: string }
@@ -116,11 +120,12 @@
 <div
 	class="overlay"
 	role="presentation"
-	onpointerdown={(event) => event.target === event.currentTarget && onclose()}
-	use:layer={onclose}
+	onpointerdown={(event) => (pressStartedOnBackdrop = event.target === event.currentTarget)}
+	onclick={(event) => event.target === event.currentTarget && pressStartedOnBackdrop && onclose()}
+	use:layer={{ close: onclose, trap: true }}
 >
 	<div class="panel" role="dialog" aria-modal="true" aria-label={$lang('search')}>
-		<div class="search">
+		<div class="search field-frame">
 			<Icon name="search" size={ICON.control} />
 			<input
 				type="text"
@@ -130,14 +135,7 @@
 				spellcheck="false"
 				use:focusOnMount
 			/>
-			<button
-				type="button"
-				class="icon-button"
-				aria-label={$lang('hearth_close')}
-				onclick={onclose}
-			>
-				<Icon name="close" size={ICON.control} />
-			</button>
+			<CloseButton onclick={onclose} />
 		</div>
 		<div class="list">
 			{#each results as result, index (result.kind === 'room' ? `room:${result.id}` : `entity:${result.entityId}`)}
@@ -188,20 +186,20 @@
 		display: flex;
 		align-items: flex-start;
 		justify-content: center;
-		padding-top: 12vh;
+		padding-top: 12dvh;
 	}
 
 	.panel {
 		width: 480px;
 		max-width: calc(100vw - 40px);
-		max-height: calc(100vh - 80px);
+		max-height: calc(100dvh - 80px);
 		display: flex;
 		flex-direction: column;
 		background: linear-gradient(180deg, var(--h-sheet-0), var(--h-sheet-1));
 		border: 1px solid rgb(var(--h-accent-rgb) / calc(0.18 * var(--h-accent-scale)));
 		border-radius: var(--h-radius-xl);
-		padding: 20px 22px;
-		box-shadow: 0 40px 100px var(--h-scrim);
+		padding: var(--h-modal-padding);
+		box-shadow: var(--h-shadow-layer);
 	}
 
 	.search {
@@ -235,19 +233,6 @@
 
 	.search input::placeholder {
 		color: var(--h-text-6);
-	}
-
-	.icon-button {
-		display: flex;
-		color: var(--h-icon);
-		cursor: pointer;
-		border: 0;
-		background: none;
-		padding: 0;
-	}
-
-	.icon-button:hover {
-		color: var(--h-text-3);
 	}
 
 	.list {
@@ -313,5 +298,25 @@
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
+	}
+
+	/*
+	 * See breakpoints.ts: a full-width sheet like every other overlay. It
+	 * hangs from the top rather than rising from the bottom, since the
+	 * on-screen keyboard takes the bottom of the screen while typing.
+	 */
+	@media (max-width: 900px) {
+		.overlay {
+			padding: 0 env(safe-area-inset-right) 0 env(safe-area-inset-left);
+		}
+
+		.panel {
+			width: 100%;
+			max-width: none;
+			max-height: 100dvh;
+			border-top: 0;
+			border-radius: 0 0 var(--h-radius-xl) var(--h-radius-xl);
+			padding-top: calc(16px + env(safe-area-inset-top));
+		}
 	}
 </style>

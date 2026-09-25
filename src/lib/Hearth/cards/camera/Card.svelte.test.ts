@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { states } from '$lib/core/ha/entities';
 import { cameraCard, cameraEntities } from '../../model/cards/camera';
 import { hearthEditMode, popup } from '../../store';
-import { hassEntity } from '../../testing';
+import { hassEntity } from '$lib/core/ha/testing';
 import Card from './Card.svelte';
 
 const picture = (id: string) => ({

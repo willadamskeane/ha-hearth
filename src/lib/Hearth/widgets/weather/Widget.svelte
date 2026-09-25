@@ -3,7 +3,9 @@
 	import { connected } from '$lib/core/ha/connection';
 	import { subscribeForecast } from '$lib/core/ha/history';
 	import { lang, selectedLanguage } from '$lib/core/i18n';
-	import { entityState } from '$lib/core/ha/entities';
+	import { entityAvailable, entityState } from '$lib/core/ha/entities';
+	import { openEntityDetail } from '$lib/Hearth/details';
+	import { displayTimeZone } from '../../store';
 	import Icon from '../../Icon.svelte';
 	import { numberFormat } from '$lib/core/i18n/time';
 	import StripChip from '../StripChip.svelte';
@@ -37,8 +39,10 @@
 	}
 
 	let selectedEntity = $derived(entityState(weatherEntity));
-	let entity = $derived($selectedEntity);
-	let condition = $derived(entity?.state ?? '');
+	let entity = $derived(weatherEntity ? $selectedEntity : undefined);
+	// an unreachable entity reads as unknown, never as a sunny day
+	let available = $derived(entityAvailable(entity));
+	let condition = $derived(available ? (entity?.state ?? '') : '');
 	let temperature = $derived(entity?.attributes?.temperature);
 	let apparent = $derived(entity?.attributes?.apparent_temperature);
 	let sub = $derived(
@@ -53,6 +57,7 @@
 	$effect(() => {
 		const entityId = weatherEntity;
 		const locale = $selectedLanguage;
+		const timeZone = $displayTimeZone;
 		forecast = [];
 		if (!$connected || !entityId) return;
 
@@ -60,7 +65,9 @@
 		let unsubscribe: (() => void) | undefined;
 		subscribeForecast(entityId, 'daily', (days) => {
 			forecast = days.slice(1, 4).map((day) => ({
-				day: new Date(day.datetime).toLocaleDateString(locale, { weekday: 'short' }).toUpperCase(),
+				day: new Date(day.datetime)
+					.toLocaleDateString(locale, { weekday: 'short', ...(timeZone ? { timeZone } : {}) })
+					.toUpperCase(),
 				temp: `${Math.round(day.temperature ?? 0)}°`
 			}));
 		})
@@ -79,56 +86,71 @@
 	});
 </script>
 
-{#if compact}
-	<StripChip
-		icon={conditionIcons[condition] ?? 'clear_day'}
-		iconColor="rgb(var(--h-accent-rgb))"
-		fill
-		label={sub}
-	>
-		{typeof temperature === 'number'
-			? numberFormat($selectedLanguage).format(Math.round(temperature))
-			: '-'}°
-	</StripChip>
-{:else}
-	<div class="card">
-		<div class="row">
-			<Icon
-				name={conditionIcons[condition] ?? 'clear_day'}
-				size={ICON.control}
-				color="rgb(var(--h-accent-rgb))"
-				fill
-			/>
-			<div class="current">
-				<div class="temp">
-					{typeof temperature === 'number'
-						? numberFormat($selectedLanguage).format(Math.round(temperature))
-						: '-'}°
+{#snippet content()}
+	<div class="row">
+		<Icon
+			name={available ? (conditionIcons[condition] ?? 'cloud') : 'cloud_off'}
+			size={ICON.control}
+			color={available ? 'rgb(var(--h-accent-rgb))' : 'var(--h-icon)'}
+			fill={available}
+		/>
+		<div class="current">
+			<div class="temp">
+				{available && typeof temperature === 'number'
+					? `${numberFormat($selectedLanguage).format(Math.round(temperature))}°`
+					: '-'}
+			</div>
+			<div class="sub">{available ? sub : $lang('unavailable')}</div>
+		</div>
+		<div class="forecast">
+			{#each forecast as day (day.day)}
+				<div>
+					<div class="day">{day.day}</div>
+					<div class="value">{day.temp}</div>
 				</div>
-				<div class="sub">{sub}</div>
-			</div>
-			<div class="forecast">
-				{#each forecast as day (day.day)}
-					<div>
-						<div class="day">{day.day}</div>
-						<div class="value">{day.temp}</div>
-					</div>
-				{/each}
-			</div>
+			{/each}
 		</div>
 	</div>
+{/snippet}
+{#if compact}
+	<StripChip
+		icon={available ? (conditionIcons[condition] ?? 'cloud') : 'cloud_off'}
+		iconColor={available ? 'rgb(var(--h-accent-rgb))' : 'var(--h-icon)'}
+		fill={available}
+		label={available ? sub : $lang('unavailable')}
+		onclick={entity ? () => openEntityDetail(entity.entity_id) : undefined}
+	>
+		{available && typeof temperature === 'number'
+			? `${numberFormat($selectedLanguage).format(Math.round(temperature))}°`
+			: '-'}
+	</StripChip>
+{:else if entity}
+	<button type="button" class="card pressable" onclick={() => openEntityDetail(entity.entity_id)}>
+		{@render content()}
+	</button>
+{:else}
+	<div class="card">{@render content()}</div>
 {/if}
 
 <style>
 	.card {
 		margin-top: 28px;
 		margin-bottom: 8px;
-		padding: 16px 18px;
+		padding: var(--h-card-padding);
 		border-radius: var(--h-radius-card);
 		background: rgb(var(--h-surface-rgb) / calc(0.05 * var(--h-fill-scale)));
 		backdrop-filter: var(--h-surface-blur);
 		box-shadow: var(--h-card-shadow);
 		border: 1px solid rgb(var(--h-line-rgb) / calc(0.07 * var(--h-line-scale)));
+		display: block;
+		width: 100%;
+		font: inherit;
+		color: inherit;
+		text-align: left;
+	}
+
+	button.card {
+		cursor: pointer;
 	}
 
 	.row {

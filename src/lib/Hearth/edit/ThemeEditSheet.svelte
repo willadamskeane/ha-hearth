@@ -1,4 +1,5 @@
 <script lang="ts">
+	import LoadingState from '../LoadingState.svelte';
 	import { ICON } from '../iconSizes';
 	import { lang, fill } from '$lib/core/i18n';
 	import { activateOnKeyboard } from '../interaction';
@@ -21,7 +22,13 @@
 		THEME_PRESETS,
 		type HearthTheme
 	} from '$lib/core/theme';
-	import { editedThemeSlot, editor, hearthConfig, updateConfig } from '../store';
+	import {
+		editedThemeSlot,
+		editor,
+		hearthConfig,
+		requestConfirmation,
+		updateConfig
+	} from '../store';
 	import EditSheet from './EditSheet.svelte';
 	import ColorField from './ColorField.svelte';
 	import EntityField from './EntityField.svelte';
@@ -104,6 +111,15 @@
 
 	let switchEntity = $state(get(hearthConfig).day_night?.entity ?? '');
 	let nightState = $state(get(hearthConfig).day_night?.night_state ?? '');
+	let switchFields = $state<HTMLElement>();
+
+	// Typing reaches applySwitch through the bubbling change event, like the
+	// background URL. The picker sets the value with no event of its own, so a
+	// value that arrives while the field's own input is not focused applies here.
+	function setSwitchEntity(next: string) {
+		switchEntity = next;
+		if (switchFields?.querySelector('input') !== document.activeElement) applySwitch();
+	}
 
 	function applySwitch() {
 		const entity = switchEntity.trim();
@@ -180,8 +196,16 @@
 		backgroundImageUrl = unwrapUrl(saved.theme.background_image);
 	}
 
+	function confirmDeleteSavedTheme(saved: SavedTheme) {
+		requestConfirmation({
+			title: fill($lang('hearth_delete_theme_confirm'), { name: saved.name }),
+			message: $lang('hearth_delete_theme_message'),
+			confirmLabel: $lang('delete'),
+			action: () => void deleteSavedTheme(saved)
+		});
+	}
+
 	async function deleteSavedTheme(saved: SavedTheme) {
-		if (!confirm(fill($lang('hearth_delete_theme_confirm'), { name: saved.name }))) return;
 		themesError = '';
 		try {
 			const response = await fetch(`${base}/_api/hearth_themes`, {
@@ -232,19 +256,23 @@
 			.value;
 	});
 
+	// every field applies live, so closing keeps a value still being typed
+	// rather than dropping it; there is nothing staged for Done to commit
 	function close() {
+		applyBackgroundImage();
+		applySwitch();
 		editedThemeSlot.set('day');
 		editor.set(null);
 	}
-
-	function done() {
-		applyBackgroundImage();
-		applySwitch();
-		close();
-	}
 </script>
 
-<EditSheet title={$lang('theme')} onclose={close} ondone={done} floating>
+<EditSheet
+	title={$lang('theme')}
+	onclose={close}
+	ondone={close}
+	doneLabel={$lang('hearth_close')}
+	floating
+>
 	<div class="slots">
 		<div
 			class="slot pressable"
@@ -271,7 +299,7 @@
 		</div>
 	</div>
 
-	<div class="hint">
+	<div class="field-hint">
 		{#if slot === 'night'}
 			{#if nightEnabled}
 				{$lang('hearth_shown_while_the_switch_entity_reads')}
@@ -284,14 +312,17 @@
 	</div>
 
 	<div class="group-label">{$lang('hearth_day_night_switch')}</div>
-	<EntityField label={$lang('hearth_switch_entity')} bind:value={switchEntity} />
-	<TextField
-		label={$lang('hearth_night_states')}
-		bind:value={nightState}
-		placeholder="below_horizon"
-	/>
-	<div class="hint">
-		{$lang('hearth_comma_separated_when_empty_below_horizon')}
+	<div class="switch-fields" bind:this={switchFields} onchange={applySwitch}>
+		<EntityField
+			label={$lang('hearth_switch_entity')}
+			bind:value={() => switchEntity, setSwitchEntity}
+		/>
+		<TextField
+			label={$lang('hearth_night_states')}
+			bind:value={nightState}
+			placeholder="below_horizon"
+			hint={$lang('hearth_comma_separated_when_empty_below_horizon')}
+		/>
 	</div>
 
 	{#if nightEnabled}
@@ -321,7 +352,7 @@
 					style:background="linear-gradient(135deg, {preset.theme?.background_inner ??
 						THEME_DEFAULTS.background_inner} 55%, {preset.theme?.accent ?? THEME_DEFAULTS.accent})"
 				></span>
-				<span>{preset.name}</span>
+				<span>{$lang(`hearth_theme_preset_${preset.id}`)}</span>
 			</div>
 		{/each}
 	</div>
@@ -331,7 +362,7 @@
 		<input
 			type="text"
 			bind:value={newThemeName}
-			placeholder="Save current as..."
+			placeholder={$lang('hearth_save_current_theme_as')}
 			spellcheck="false"
 			onkeydown={(event) => event.key === 'Enter' && saveCurrentTheme()}
 		/>
@@ -346,11 +377,11 @@
 	</div>
 
 	{#if themesError}
-		<div class="error">{themesError}</div>
+		<div class="error" role="alert">{themesError}</div>
 	{/if}
 
 	{#if themesLoading}
-		<div class="hint">{$lang('hearth_loading_saved_themes')}</div>
+		<LoadingState inline text={$lang('hearth_loading_saved_themes')} />
 	{:else if savedThemes.length}
 		<div class="saved-themes">
 			{#each savedThemes as saved (saved.id)}
@@ -372,7 +403,7 @@
 						type="button"
 						class="icon-button"
 						aria-label={`${$lang('delete')} ${saved.name}`}
-						onclick={() => deleteSavedTheme(saved)}
+						onclick={() => confirmDeleteSavedTheme(saved)}
 					>
 						<Icon name="delete" size={ICON.control} />
 					</button>
@@ -381,7 +412,7 @@
 		</div>
 	{/if}
 
-	<div class="hint">
+	<div class="field-hint">
 		{$lang('hearth_saving_or_deleting_a_theme_writes')}
 	</div>
 
@@ -442,14 +473,17 @@
 	<TextField
 		label={$lang('hearth_background_image_url')}
 		bind:value={backgroundImageUrl}
-		placeholder="/local/wallpaper.jpg or https://..."
+		placeholder={$lang('hearth_example_background_image')}
 		onchange={applyBackgroundImage}
 	/>
 
 	<SelectField
 		label={$lang('hearth_text_contrast')}
 		value={textContrast}
-		options={TEXT_CONTRAST_SCALES.map(({ value, label }) => ({ value, label }))}
+		options={TEXT_CONTRAST_SCALES.map(({ value }) => ({
+			value,
+			label: $lang(`hearth_text_contrast_${value}`)
+		}))}
 		onchange={(value) => {
 			const scale = TEXT_CONTRAST_SCALES.find((entry) => entry.value === value);
 			if (scale) {
@@ -461,7 +495,10 @@
 	<SelectField
 		label={$lang('hearth_text_shadow')}
 		value={textShadow}
-		options={TEXT_SHADOW_SCALES.map(({ value, label }) => ({ value, label }))}
+		options={TEXT_SHADOW_SCALES.map(({ value }) => ({
+			value,
+			label: $lang(`hearth_text_shadow_${value}`)
+		}))}
 		onchange={(value) => {
 			const scale = TEXT_SHADOW_SCALES.find((entry) => entry.value === value);
 			if (scale) patchTheme({ text_shadow: scale.shadow });
@@ -471,7 +508,10 @@
 	<SelectField
 		label={$lang('hearth_glass')}
 		value={surfaceBlur}
-		options={SURFACE_BLUR_SCALES.map(({ value, label }) => ({ value, label }))}
+		options={SURFACE_BLUR_SCALES.map(({ value }) => ({
+			value,
+			label: $lang(`hearth_glass_${value}`)
+		}))}
 		onchange={(value) => {
 			const scale = SURFACE_BLUR_SCALES.find((entry) => entry.value === value);
 			if (scale) patchTheme({ surface_blur: scale.blur });
@@ -481,14 +521,17 @@
 	<SelectField
 		label={$lang('hearth_corners')}
 		value={radiusScale}
-		options={RADIUS_SCALES.map(({ value, label }) => ({ value, label }))}
+		options={RADIUS_SCALES.map(({ value }) => ({
+			value,
+			label: $lang(`hearth_corners_${value}`)
+		}))}
 		onchange={(value) => {
 			const scale = RADIUS_SCALES.find((entry) => entry.value === value);
 			if (scale) patchTheme(deriveRadii(scale.factor));
 		}}
 	/>
 
-	<div class="hint">
+	<div class="field-hint">
 		{$lang('hearth_pickers_set_sensible_derived_shades_automatically')}
 	</div>
 	<div
@@ -505,9 +548,14 @@
 </EditSheet>
 
 <style>
+	/* groups the fields for one change listener without taking a grid cell */
+	.switch-fields {
+		display: contents;
+	}
+
 	.slots {
 		display: grid;
-		grid-template-columns: 1fr 1fr;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
 		gap: 8px;
 		margin-bottom: 12px;
 	}
@@ -543,13 +591,14 @@
 		font-family: var(--h-font-mono);
 		font-size: var(--h-type-label);
 		letter-spacing: 2px;
+		text-transform: uppercase;
 		color: var(--h-label);
 		margin: 4px 0 10px;
 	}
 
 	.presets {
 		display: grid;
-		grid-template-columns: 1fr 1fr;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
 		gap: 8px;
 		margin-bottom: 18px;
 	}
@@ -577,15 +626,9 @@
 
 	.picker-grid {
 		display: grid;
-		grid-template-columns: 1fr 1fr;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
 		gap: 8px;
 		margin-bottom: 18px;
-	}
-
-	.hint {
-		font-size: var(--h-type-small);
-		color: var(--h-text-6);
-		margin: 4px 0 12px;
 	}
 
 	.reset {

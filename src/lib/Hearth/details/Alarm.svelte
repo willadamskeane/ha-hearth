@@ -2,6 +2,7 @@
 	import { lang } from '$lib/core/i18n';
 	import { entityState } from '$lib/core/ha/entities';
 	import { callEntityService } from '$lib/core/ha/commands';
+	import { pressFeedback } from '../pressFeedback';
 
 	let { entity }: { entity: string } = $props();
 
@@ -54,6 +55,7 @@
 		<button
 			type="button"
 			class="segment"
+			use:pressFeedback={entity}
 			class:active={stateObj?.state === mode.state}
 			onclick={() => call(mode.service, true)}
 		>
@@ -63,6 +65,7 @@
 	<button
 		type="button"
 		class="segment danger"
+		use:pressFeedback={entity}
 		class:active={stateObj?.state === 'disarmed'}
 		onclick={() => call('alarm_disarm', false)}
 	>

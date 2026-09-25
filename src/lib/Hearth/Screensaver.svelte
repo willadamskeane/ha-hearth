@@ -2,22 +2,16 @@
 	import { fade } from 'svelte/transition';
 	import { cubicOut } from 'svelte/easing';
 	import { motion } from '$lib/core/app/motion';
+	import { MOTION } from '$lib/core/theme';
 	import { lang, selectedLanguage } from '$lib/core/i18n';
 	import { displayTimeZone, hearthConfig } from './store';
 	import { clockTimeOptions } from './clock';
 	import { timer } from '$lib/core/app/clock';
-	import { pushLayer } from '$lib/ui/layers';
+	import { layer } from '$lib/ui/layers';
 
 	let { minutes = 10 }: { minutes?: number } = $props();
 
 	let active = $state(false);
-
-	// while showing, the screensaver is the top layer: Escape dismisses it
-	// instead of whatever sheet it covers
-	$effect(() => {
-		if (active) return pushLayer(hide);
-	});
-	let overlay: HTMLElement | undefined = $state();
 
 	let lastActivity = Date.now();
 	let idleTimer: ReturnType<typeof setTimeout>;
@@ -48,7 +42,36 @@
 		// swallow so the wake tap/keypress never reaches the dashboard
 		event.preventDefault();
 		event.stopPropagation();
+		if (event.type === 'pointerdown') swallowNextClick();
 		hide();
+	}
+
+	/*
+	 * The overlay is gone by the time the wake tap's click fires (at once when
+	 * motion is off), so that click would land on whatever card sits under the
+	 * finger. Eat it at the window instead. The click follows pointerup almost
+	 * immediately; if none comes (a cancelled or dragged touch), stop waiting.
+	 */
+	function swallowNextClick() {
+		let timer = setTimeout(stop, 5000);
+		const swallow = (event: Event) => {
+			event.preventDefault();
+			event.stopPropagation();
+			stop();
+		};
+		const arm = () => {
+			clearTimeout(timer);
+			timer = setTimeout(stop, 300);
+		};
+		function stop() {
+			clearTimeout(timer);
+			window.removeEventListener('click', swallow, true);
+			window.removeEventListener('pointerup', arm, true);
+			window.removeEventListener('pointercancel', stop, true);
+		}
+		window.addEventListener('click', swallow, true);
+		window.addEventListener('pointerup', arm, true);
+		window.addEventListener('pointercancel', stop, true);
 	}
 
 	$effect(() => {
@@ -59,11 +82,6 @@
 			for (const name of events) window.removeEventListener(name, recordActivity);
 			clearTimeout(idleTimer);
 		};
-	});
-
-	$effect(() => {
-		// focus so keydown targets the overlay instead of the dashboard
-		if (active) overlay?.focus();
 	});
 
 	let configuredClock = $derived($hearthConfig.rail.find((widget) => widget.type === 'clock'));
@@ -87,17 +105,22 @@
 	);
 </script>
 
+<!--
+	While showing, the screensaver is the top layer: Escape dismisses it instead
+	of whatever sheet it covers. It takes focus so keydown targets it rather than
+	the dashboard, and hands focus back to where it was on wake.
+-->
 {#if active}
 	<div
 		class="screensaver"
-		bind:this={overlay}
 		tabindex="-1"
 		role="button"
 		aria-label={$lang('hearth_dismiss_screensaver')}
-		in:fade={{ duration: $motion ? 1200 : 0, easing: cubicOut }}
-		out:fade={{ duration: $motion ? 150 : 0 }}
+		in:fade={{ duration: $motion ? MOTION.theme * 2 : 0, easing: cubicOut }}
+		out:fade={{ duration: $motion ? MOTION.fast : 0 }}
 		onpointerdown={dismiss}
 		onkeydown={dismiss}
+		use:layer={{ close: hide, initialFocus: true }}
 	>
 		<div
 			class="screensaver-content"
@@ -130,7 +153,7 @@
 	}
 
 	.screensaver-content.drift {
-		animation: screensaver-drift 90s ease-in-out infinite alternate;
+		animation: screensaver-drift 90s ease-in-out infinite alternate; /* literal ok: slow drift period, not a transition */
 	}
 
 	.clock {

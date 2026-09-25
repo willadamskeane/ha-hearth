@@ -179,7 +179,7 @@
 			{:else}
 				<TextField
 					label={$lang('hearth_media_query')}
-					placeholder="(max-width: 700px)"
+					placeholder="(max-width: 900px)"
 					bind:value={() => mediaValue(index), (media) => setMedia(index, media)}
 				/>
 			{/if}
@@ -211,6 +211,7 @@
 		font-family: var(--h-font-mono);
 		font-size: var(--h-type-label);
 		letter-spacing: 2px;
+		text-transform: uppercase;
 		color: var(--h-label);
 		margin: 18px 0 10px;
 	}

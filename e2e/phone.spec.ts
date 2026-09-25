@@ -25,6 +25,98 @@ test('the page strip sits at the top and switches pages without scrolling', asyn
 	expect(overflow).toBe(0);
 });
 
+test('the window reaches under the device cutouts', async ({ page }) => {
+	// without viewport-fit=cover every env(safe-area-inset-*) in the stylesheets
+	// resolves to zero, whatever the device
+	await expect(page.locator('meta[name="viewport"]')).toHaveAttribute(
+		'content',
+		/viewport-fit=cover/
+	);
+});
+
+test('the glance widgets ride above the page in the status strip', async ({ page }) => {
+	// this fork keeps the clock and the other glance widgets in the status strip
+	// above the page switcher; the folded rail runs only draw what neither the
+	// strip nor the switcher already shows, which for this rail is nothing
+	const status = page.getByRole('group', { name: 'Status' });
+	await expect(status).toBeVisible();
+	const statusBox = (await status.boundingBox())!;
+	const pageBox = (await page.locator('.main').boundingBox())!;
+	expect(statusBox.y).toBeLessThan(pageBox.y);
+	await expect(page.locator('.rail-run')).toHaveCount(0);
+
+	// the strip carries the pages, so the rail's own copy would be redundant
+	await expect(
+		page.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: 'Office' })
+	).toBeVisible();
+});
+
+/* short enough that the first page has somewhere to scroll to */
+test.describe('switching pages', () => {
+	test.use({ viewport: { width: 390, height: 500 } });
+
+	test('a page opens at its own top, not the previous page scroll offset', async ({ page }) => {
+		// the fixture has one page; the second one is the point of the test
+		await page.getByRole('button', { name: 'Edit Hearth configuration' }).click();
+		await page.getByRole('button', { name: 'Add page' }).first().click();
+		const sheet = page.getByRole('dialog', { name: 'Add page' });
+		await sheet.getByLabel('Name').fill('Garage');
+		await sheet.getByRole('button', { name: 'Done' }).click();
+
+		const strip = page.getByRole('navigation', { name: 'Pages' });
+		const office = strip.getByRole('button', { name: 'Office' });
+		await office.click();
+
+		const scrollTop = () =>
+			page.evaluate(() => (document.querySelector('.layout') as HTMLElement).scrollTop);
+		await page.evaluate(() => {
+			const layout = document.querySelector('.layout') as HTMLElement;
+			layout.scrollTop = layout.scrollHeight;
+		});
+		expect(await scrollTop()).toBeGreaterThan(0);
+
+		const garage = strip.getByRole('button', { name: 'Garage' });
+		await garage.click();
+		await expect(garage).toHaveAttribute('aria-current', 'page');
+		expect(await scrollTop()).toBe(0);
+	});
+});
+
+test.describe('scrolled', () => {
+	// short enough for the page to scroll past the status strip above the switcher
+	test.use({ viewport: { width: 390, height: 400 } });
+
+	test('nothing scrolls under the page strip', async ({ page }) => {
+		await page.evaluate(() => {
+			(document.querySelector('.layout') as HTMLElement).scrollTop = 400;
+		});
+		const strip = page.getByRole('navigation', { name: 'Pages' });
+		const box = (await strip.boundingBox())!;
+		expect(Math.round(box.y)).toBe(0);
+		// opaque, so the page passing behind it cannot show through the pills
+		await expect(strip).toHaveCSS('background-image', 'none');
+	});
+});
+
+test.describe('held sideways', () => {
+	test.use({ viewport: { width: 844, height: 390 } });
+
+	test('the page starts at the strip and the pills shed their labels', async ({ page }) => {
+		// no height to spend before the page, so nothing rides above it: the
+		// status strip steps aside and its glance widgets follow the page
+		await expect(page.locator('.status-strip')).toHaveCount(0);
+		await expect(page.locator('.rail-run')).toHaveCount(1);
+		const main = (await page.locator('.main').boundingBox())!;
+		expect(main.y).toBeLessThan(120);
+
+		const strip = page.getByRole('navigation', { name: 'Pages' });
+		const office = strip.getByRole('button', { name: 'Office' });
+		// the label goes to assistive technology rather than being dropped
+		await expect(office).toHaveAttribute('aria-current', 'page');
+		await expect(office).toBeVisible();
+	});
+});
+
 test('a light popup opens as a bottom sheet and the card sheet leads with its fields', async ({
 	page
 }) => {
@@ -34,7 +126,7 @@ test('a light popup opens as a bottom sheet and the card sheet leads with its fi
 	await page.mouse.down();
 	await page.waitForTimeout(700);
 	await page.mouse.up();
-	const toggle = page.getByRole('button', { name: 'Toggle light' });
+	const toggle = page.getByRole('switch', { name: 'Toggle light' });
 	await expect(toggle).toBeVisible();
 	const sheetBox = (await page.locator('.sheet').first().boundingBox())!;
 	expect(Math.round(sheetBox.x + sheetBox.width)).toBe(390);

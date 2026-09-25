@@ -41,6 +41,7 @@ app.use((request, _response, next) => {
 		addon,
 		hassUrl: proxyTarget,
 		publicHassUrl: process.env.PUBLIC_HASS_URL,
+		directPublicHassUrl: process.env.HASS_PUBLIC_URL,
 		hassPort: process.env.HASS_PORT,
 		exposedPort: process.env.EXPOSED_PORT,
 		secure: request.secure

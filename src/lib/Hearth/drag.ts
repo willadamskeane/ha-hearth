@@ -23,6 +23,11 @@ interface DragOptions {
 	 * retargets to the tile.
 	 */
 	ignore?: string;
+	/**
+	 * Report the unrounded percentage, for callers that map it onto their own
+	 * range and step; whole percents would cap a 0-1000 range at steps of 10.
+	 */
+	precise?: boolean;
 }
 
 /** Movement (in either direction) beyond which a press is no longer a tap. */
@@ -83,6 +88,11 @@ export const horizontalDrag: Action<HTMLElement, DragOptions> = (node, options) 
 		return Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
 	}
 
+	function percent(event: PointerEvent) {
+		const value = fraction(event) * 100;
+		return current.precise ? value : Math.round(value);
+	}
+
 	function handleDown(event: PointerEvent) {
 		if (current.disabled) return;
 		if (current.ignore && (event.target as Element).closest?.(current.ignore)) return;
@@ -123,7 +133,7 @@ export const horizontalDrag: Action<HTMLElement, DragOptions> = (node, options) 
 		}
 		if (dx > TAP_SLOP_PX) tracking.moved = true;
 		if (tracking.moved) {
-			const value = Math.round(fraction(event) * 100);
+			const value = percent(event);
 			feedStep(value);
 			current.set(value, current.updateMode !== 'release');
 		}
@@ -134,7 +144,7 @@ export const horizontalDrag: Action<HTMLElement, DragOptions> = (node, options) 
 		if (tracking.held) {
 			// the hold already acted; the release must not toggle on top of it
 		} else if (tracking.moved) {
-			const value = Math.round(fraction(event) * 100);
+			const value = percent(event);
 			// Always commit the final value. In release mode this is the gesture's
 			// only service call; in continuous mode it guarantees the exact endpoint.
 			vibrate('commit');
@@ -193,4 +203,4 @@ export const horizontalDrag: Action<HTMLElement, DragOptions> = (node, options) 
 	};
 };
 
-export { onDndReceive } from '$lib/ui/actions/sortable';
+export { onDndReceive, type DndReceiveDetail } from '$lib/ui/actions/sortable';

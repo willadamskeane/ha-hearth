@@ -4,15 +4,16 @@
 	import { get } from 'svelte/store';
 	import Ripple from '$lib/ui/actions/ripple';
 	import { activateOnKeyboard } from '../interaction';
-	import type { RailWidget, VisibilityCondition } from '../types';
-	import { normalizeVisibility, PRESS_RIPPLE, slugify, uniqueId } from '../config';
+	import type { MobileSlot, RailWidget, VisibilityCondition } from '../types';
+	import { moveItem, normalizeVisibility, PRESS_RIPPLE, slugify, uniqueId } from '../config';
 	import { RAIL_WIDGET_TYPES, widgetDescriptor, type WidgetDraft } from '../widgets';
 	import { editor, hearthConfig, updateConfig } from '../store';
 	import EditSheet from './EditSheet.svelte';
 	import Icon from '../Icon.svelte';
 	import TypeGallery from './TypeGallery.svelte';
 	import RailWidgetRenderer from '../RailWidgetRenderer.svelte';
-	import VisibilityField from './VisibilityField.svelte';
+	import PreviewPane from './PreviewPane.svelte';
+	import VisibilitySection from './VisibilitySection.svelte';
 
 	let { index }: { index: number | null } = $props();
 
@@ -21,26 +22,26 @@
 	const initial = index !== null ? get(hearthConfig).rail[index] : undefined;
 
 	let type = $state<RailWidget['type']>(initial?.type ?? 'status');
-	let hideMobile = $state(initial?.hide_mobile ?? false);
+	// undefined is the automatic slot: the rail's own flexible gap decides
+	let mobile = $state<MobileSlot | undefined>(
+		initial?.mobile ?? (initial?.hide_mobile ? 'hidden' : undefined)
+	);
 	let visibility = $state<VisibilityCondition[]>(
 		(initial?.visibility ?? []).map((condition) => ({ ...condition }))
 	);
 	// svelte-ignore state_referenced_locally
 	let typeOpen = $state(index === null);
-	// svelte-ignore state_referenced_locally
-	let conditionsOpen = $state(visibility.length > 0);
 	let draft = $state<WidgetDraft<RailWidget>>({ fields: {} as WidgetDraft<RailWidget>['fields'] });
 
 	let descriptor = $derived(widgetDescriptor(type));
 	let editorInitial = $derived(initial?.type === type ? initial : undefined);
 
-	let alwaysVisible = $derived(!hideMobile && visibility.length === 0);
-
-	function setAlwaysVisible() {
-		hideMobile = false;
-		visibility = [];
-		conditionsOpen = false;
-	}
+	const MOBILE_CHOICES = [
+		{ slot: undefined, label: 'hearth_mobile_auto', icon: 'auto_awesome' },
+		{ slot: 'top', label: 'hearth_mobile_above_page', icon: 'vertical_align_top' },
+		{ slot: 'bottom', label: 'hearth_mobile_below_page', icon: 'vertical_align_bottom' },
+		{ slot: 'hidden', label: 'hearth_hide_on_mobile', icon: 'smartphone' }
+	] as const;
 
 	function close() {
 		editor.set(null);
@@ -59,17 +60,25 @@
 			...(descriptor.normalize?.(fields) ?? {}),
 			id,
 			type,
-			hide_mobile: hideMobile || undefined,
+			mobile,
+			// superseded by `mobile`; a saved widget never carries both
+			hide_mobile: undefined,
 			visibility: normalizeVisibility($state.snapshot(visibility))
 		} as RailWidget;
 	}
 
 	let previewWidget = $derived.by(() => buildWidget('preview'));
 
+	// moving the widget shifts its index, so later writes find it by id
+	function widgetIndex(rail: RailWidget[]) {
+		return initial ? rail.findIndex((widget) => widget.id === initial.id) : -1;
+	}
+
 	function done() {
 		updateConfig((config) => {
-			if (index !== null) {
-				config.rail[index] = buildWidget(config.rail[index].id);
+			if (initial) {
+				const position = widgetIndex(config.rail);
+				if (position >= 0) config.rail[position] = buildWidget(initial.id);
 			} else {
 				const taken = config.rail.map((widget) => widget.id);
 				config.rail.push(buildWidget(uniqueId(slugify(type), taken)));
@@ -80,9 +89,14 @@
 
 	function remove() {
 		updateConfig((config) => {
-			if (index !== null) config.rail.splice(index, 1);
+			const position = widgetIndex(config.rail);
+			if (position >= 0) config.rail.splice(position, 1);
 		});
 		close();
+	}
+
+	function move(delta: number) {
+		updateConfig((config) => moveItem(config.rail, widgetIndex(config.rail), delta));
 	}
 </script>
 
@@ -91,7 +105,9 @@
 	onclose={close}
 	ondone={done}
 	doneDisabled={typeOpen || draft.valid === false}
-	onremove={index !== null ? remove : undefined}
+	onremove={initial ? remove : undefined}
+	onmoveup={initial ? () => move(-1) : undefined}
+	onmovedown={initial ? () => move(1) : undefined}
 	wide
 >
 	<TypeGallery
@@ -119,62 +135,43 @@
 				{/if}
 			{/key}
 
-			<div class="chips">
-				<span
-					class="chip pressable"
-					class:active={alwaysVisible}
-					use:Ripple={PRESS_RIPPLE}
-					role="button"
-					tabindex="0"
-					aria-pressed={alwaysVisible}
-					onclick={setAlwaysVisible}
-					onkeydown={(event) => activateOnKeyboard(event, setAlwaysVisible)}
-				>
-					<Icon name="visibility" size={ICON.inline} />
-					{$lang('hearth_always_visible')}
-				</span>
-				<span
-					class="chip pressable"
-					class:active={hideMobile}
-					use:Ripple={PRESS_RIPPLE}
-					role="button"
-					tabindex="0"
-					aria-pressed={hideMobile}
-					onclick={() => (hideMobile = !hideMobile)}
-					onkeydown={(event) => activateOnKeyboard(event, () => (hideMobile = !hideMobile))}
-				>
-					<Icon name="smartphone" size={ICON.inline} />
-					{$lang('hearth_hide_on_mobile')}
-				</span>
-				<span
-					class="chip pressable"
-					class:active={visibility.length > 0 || conditionsOpen}
-					use:Ripple={PRESS_RIPPLE}
-					role="button"
-					tabindex="0"
-					aria-expanded={conditionsOpen}
-					onclick={() => (conditionsOpen = !conditionsOpen)}
-					onkeydown={(event) => activateOnKeyboard(event, () => (conditionsOpen = !conditionsOpen))}
-				>
-					<Icon name="rule" size={ICON.inline} />
-					{$lang('conditions')}{visibility.length ? ` (${visibility.length})` : ''}
-				</span>
-			</div>
+			<VisibilitySection
+				bind:value={visibility}
+				hiddenElsewhere={mobile === 'hidden'}
+				onalwaysvisible={() => {
+					if (mobile === 'hidden') mobile = undefined;
+				}}
+			/>
 
-			{#if conditionsOpen}
-				<VisibilityField bind:value={visibility} />
+			<div class="group-label">{$lang('hearth_on_mobile')}</div>
+			<div class="chips">
+				{#each MOBILE_CHOICES as choice (choice.label)}
+					<span
+						class="chip pressable"
+						class:active={mobile === choice.slot}
+						use:Ripple={PRESS_RIPPLE}
+						role="button"
+						tabindex="0"
+						aria-pressed={mobile === choice.slot}
+						onclick={() => (mobile = choice.slot)}
+						onkeydown={(event) => activateOnKeyboard(event, () => (mobile = choice.slot))}
+					>
+						<Icon name={choice.icon} size={ICON.inline} />
+						{$lang(choice.label)}
+					</span>
+				{/each}
+			</div>
+			{#if mobile === undefined}
+				<div class="hint">{$lang('hearth_mobile_auto_hint')}</div>
 			{/if}
 		</div>
-		<aside class="pane">
-			<div class="pane-label">{$lang('hearth_live_preview')}</div>
-			<div class="preview-well" style="pointer-events: none">
-				{#if previewWidget.type === 'spacer' && !previewWidget.height && !previewWidget.line}
-					<div class="preview-note">{$lang('hearth_flexible_gap_pushes_the_widgets_around')}</div>
-				{:else}
-					<RailWidgetRenderer widget={previewWidget} />
-				{/if}
-			</div>
-		</aside>
+		<PreviewPane>
+			{#if previewWidget.type === 'spacer' && !previewWidget.height && !previewWidget.line}
+				<div class="preview-note">{$lang('hearth_flexible_gap_pushes_the_widgets_around')}</div>
+			{:else}
+				<RailWidgetRenderer widget={previewWidget} />
+			{/if}
+		</PreviewPane>
 	</div>
 </EditSheet>
 
@@ -190,30 +187,8 @@
 		display: none;
 	}
 
-	.pane {
-		position: sticky;
-		top: 0;
-	}
-
-	.pane-label {
-		font-family: var(--h-font-mono);
-		font-size: var(--h-type-label);
-		letter-spacing: 0.14em;
-		text-transform: uppercase;
-		color: var(--h-label);
-		margin-bottom: 10px;
-	}
-
 	.config {
 		min-width: 0;
-	}
-
-	.preview-well {
-		border-radius: var(--h-radius-md);
-		background: var(--h-inset);
-		border: 1px solid rgb(var(--h-line-rgb) / calc(0.07 * var(--h-line-scale)));
-		padding: 22px;
-		margin-bottom: 16px;
 	}
 
 	.preview-note {
@@ -222,42 +197,11 @@
 		text-align: center;
 	}
 
-	.chips {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		gap: 8px;
-		margin: 4px 0 14px;
-	}
-
-	.chip {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		padding: 8px 14px;
-		border-radius: var(--h-radius-card);
-		border: 1px solid rgb(var(--h-line-rgb) / calc(0.1 * var(--h-line-scale)));
-		font-size: var(--h-type-secondary);
-		color: var(--h-text-4);
-		cursor: pointer;
-		user-select: none;
-		-webkit-user-select: none;
-	}
-
-	.chip.active {
-		background: rgb(var(--h-accent-rgb) / calc(0.12 * var(--h-accent-scale)));
-		border-color: rgb(var(--h-accent-rgb) / calc(0.25 * var(--h-accent-scale)));
-		color: var(--h-accent-icon);
-	}
-
-	@media (max-width: 820px) {
+	/* see breakpoints.ts */
+	@media (max-width: 900px) {
 		.rail-editor {
 			grid-template-columns: 1fr;
 			gap: 18px;
-		}
-
-		.pane {
-			position: static;
 		}
 	}
 </style>

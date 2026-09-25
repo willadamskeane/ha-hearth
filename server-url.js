@@ -6,11 +6,16 @@
  * only trusted Supervisor Ingress headers or an explicitly exposed host port
  * may supply the browser-facing URL.
  *
+ * `publicHassUrl` (PUBLIC_HASS_URL) overrides everything. `directPublicHassUrl`
+ * (upstream's HASS_PUBLIC_URL) only applies to direct access: Ingress keeps the
+ * forwarded origin the browser is already on.
+ *
  * @param {import('node:http').IncomingHttpHeaders} headers
  * @param {{
  *   addon: boolean;
  *   hassUrl?: string;
  *   publicHassUrl?: string;
+ *   directPublicHassUrl?: string;
  *   hassPort?: string;
  *   exposedPort?: string;
  *   secure?: boolean;
@@ -18,13 +23,15 @@
  */
 export function resolvePublicHassUrl(headers, environment) {
 	if (environment.publicHassUrl) return environment.publicHassUrl;
-	if (!environment.addon) return environment.hassUrl;
+	if (!environment.addon) return environment.directPublicHassUrl || environment.hassUrl;
 
 	const forwardedProto = firstHeader(headers['x-forwarded-proto']);
 	const forwardedHost = firstHeader(headers['x-forwarded-host']);
 	if (isTrustedIngressRequest(headers)) {
 		return `${forwardedProto}://${forwardedHost}`;
 	}
+
+	if (environment.directPublicHassUrl) return environment.directPublicHassUrl;
 
 	const host = firstHeader(headers.host);
 	if (!host || !environment.exposedPort || !environment.hassPort) return undefined;

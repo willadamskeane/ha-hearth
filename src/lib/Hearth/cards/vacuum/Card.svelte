@@ -98,8 +98,8 @@
 			}}
 			onkeydown={(event) => event.stopPropagation()}
 		>
-			<Icon name={running ? 'stop' : 'play_arrow'} size={ICON.control} />
-			{running ? 'Stop' : 'Clean'}
+			<Icon name={running ? 'home' : 'play_arrow'} size={ICON.control} />
+			{$lang(running ? 'hearth_send_home' : 'hearth_start')}
 		</button>
 	{/if}
 	<Icon name="chevron_right" size={ICON.control} color="var(--h-icon)" />
@@ -121,7 +121,7 @@
 		display: flex;
 		align-items: center;
 		gap: 14px;
-		padding: 16px 18px;
+		padding: var(--h-card-padding);
 		border-radius: var(--h-radius-card);
 		background: rgb(var(--h-surface-rgb) / calc(0.05 * var(--h-fill-scale)));
 		backdrop-filter: var(--h-surface-blur);

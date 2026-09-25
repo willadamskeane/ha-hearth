@@ -13,10 +13,20 @@ export const hearthConfig = writable<HearthConfig>(structuredClone(DEFAULT_HEART
 // stays locked so fallback rendering can never overwrite that source.
 export const hearthLoadError = writable<string | null>(null);
 
+/** Which of the server's failure paths produced hearthLoadError. */
+export type HearthErrorKind = 'unreadable' | 'version' | 'invalid';
+export const hearthLoadErrorKind = writable<HearthErrorKind | null>(null);
+
 // True only when the server found no usable source document. The dashboard
 // can offer discovery automatically without confusing parse/I/O failures with
 // a first run.
 export const hearthNeedsSetup = writable(false);
+
+// Non-null when configuration.yaml exists but could not be read; the server
+// then runs on default application settings.
+export const configurationLoadError = writable<string | null>(null);
+
+export const setupWizardOpen = writable(false);
 
 // server-managed save counter for conflict detection between tabs
 export const hearthRevision = writable(0);
@@ -71,13 +81,18 @@ export type Editor =
 	// Existing cards are addressed by their globally unique id. Column/stack
 	// identify only the insertion destination for a new card.
 	| { kind: 'card'; roomId: string; id: string | null; column?: number; stackId?: string }
-	| { kind: 'stack'; roomId: string; column: number; index: number }
+	// a null index is a new stack, appended to the column on Done
+	| { kind: 'stack'; roomId: string; column: number; index: number | null }
 	| { kind: 'railWidget'; index: number | null }
 	| { kind: 'theme' }
 	| { kind: 'settings' }
 	| { kind: 'appSettings' }
 	| { kind: 'customCss' }
-	| { kind: 'code' };
+	// `from` is the sheet a back arrow returns to, in the state it was left in.
+	// `draft` is an unapplied YAML edit handed back from Versions; the editor
+	// closing is what discards it
+	| { kind: 'code'; draft?: string; from?: Editor }
+	| { kind: 'versions'; from?: Editor };
 
 export const editor = writable<Editor | null>(null);
 
@@ -104,6 +119,13 @@ export function cancelEdit() {
 	hearthEditMode.set(false);
 }
 
+/** True when the draft differs from what edit mode started with or last saved. */
+export function hasUnsavedEdits(): boolean {
+	return (
+		editSnapshot !== null && JSON.stringify(get(hearthConfig)) !== JSON.stringify(editSnapshot)
+	);
+}
+
 export const saveState = writable<'idle' | 'saved' | 'conflict' | 'error'>('idle');
 saveState.subscribe((state) => {
 	if (state === 'saved') vibrate('success');
@@ -124,6 +146,17 @@ export async function saveWithFeedback(force = false): Promise<void> {
 		saveFailure.set(error instanceof Error ? error.message : String(error));
 		saveState.set('error');
 	}
+}
+
+/** Outcome of the edit bar's Copy edits, kept apart from saveState since nothing is saved. */
+export const copyState = writable<'idle' | 'copied' | 'failed'>('idle');
+let copyToastTimer: ReturnType<typeof setTimeout>;
+
+export function reportCopy(outcome: 'copied' | 'failed') {
+	copyState.set(outcome);
+	vibrate(outcome === 'copied' ? 'success' : 'error');
+	clearTimeout(copyToastTimer);
+	copyToastTimer = setTimeout(() => copyState.set('idle'), 2500);
 }
 
 let saveInFlight: Promise<boolean> | null = null;
@@ -165,6 +198,8 @@ async function performSave(force: boolean): Promise<boolean> {
 	}
 	const { revision } = await response.json();
 	hearthRevision.set(revision);
+	// the file now holds a dashboard, so this is no longer a first run
+	hearthNeedsSetup.set(false);
 	saveState.set('saved');
 	clearTimeout(savedToastTimer);
 	savedToastTimer = setTimeout(() => saveState.set('idle'), 2500);
@@ -198,10 +233,13 @@ export const displayTimeZone = derived(hearthConfig, ($config) =>
 export const currentRoom = writable<string>('home');
 
 export type Popup = {
-	kind: 'light' | 'blind' | 'fan' | 'media' | 'sensor' | 'detail';
+	kind: 'light' | 'blind' | 'fan' | 'media' | 'detail';
 	entity: string;
 	name: string;
+	/** the opening tile's configured icon, shown in the popup header */
+	icon?: string;
 	sliderUpdates?: SliderUpdateMode;
+	readonly?: boolean;
 };
 
 export const popup = writable<Popup | null>(null);

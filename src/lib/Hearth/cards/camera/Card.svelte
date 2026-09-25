@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { lang } from '$lib/core/i18n';
 	import CameraPlayer from '../../CameraPlayer.svelte';
+	import EmptyState from '../../EmptyState.svelte';
 	import type { OverviewCard } from '../../config';
 	import { cameraEntities } from '../../model/cards/camera';
 	import CameraThumb from './CameraThumb.svelte';
@@ -24,7 +25,7 @@
 			<CameraPlayer entity={cameras[0]} stream={card.stream} />
 		</div>
 	{:else}
-		<div class="placeholder">{$lang('hearth_pick_a_camera_entity_in_the')}</div>
+		<EmptyState text={$lang('hearth_pick_a_camera_entity_in_the')} />
 	{/if}
 </div>
 
@@ -37,23 +38,16 @@
 	}
 
 	.camera {
-		border-radius: var(--h-radius-md);
+		border-radius: var(--h-radius-card);
 		overflow: hidden;
 		border: 1px solid rgb(var(--h-line-rgb) / calc(0.06 * var(--h-line-scale)));
+		backdrop-filter: var(--h-surface-blur);
+		box-shadow: var(--h-card-shadow);
 	}
 
 	.grid {
 		display: grid;
 		grid-template-columns: repeat(2, minmax(0, 1fr));
 		gap: 10px;
-	}
-
-	.placeholder {
-		padding: 22px;
-		border-radius: var(--h-radius-md);
-		border: 1px dashed rgb(var(--h-line-rgb) / calc(0.15 * var(--h-line-scale)));
-		color: var(--h-text-6);
-		font-size: var(--h-type-body);
-		text-align: center;
 	}
 </style>

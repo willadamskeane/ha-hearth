@@ -11,6 +11,7 @@
 	} from '$lib/core/ha/history';
 	import type { ChartWidget } from './descriptor';
 	import { applyMath, PERIOD_MS } from './math';
+	import { openEntityDetail } from '$lib/Hearth/details';
 
 	let { widget }: { widget: ChartWidget } = $props();
 
@@ -100,7 +101,7 @@
 	let circumference = 2 * Math.PI * RADIUS;
 </script>
 
-<div class="chart" class:radial={style === 'radial'}>
+{#snippet content()}
 	<div class="head">
 		<span class="name">{label}</span>
 		{#if style !== 'radial'}
@@ -110,12 +111,14 @@
 	{#if style === 'line'}
 		{#if line}
 			<svg viewBox="0 0 {WIDTH} {HEIGHT}" preserveAspectRatio="none">
-				<path d={line.area} fill="rgb(var(--h-accent-rgb) / 0.15)" />
+				<path d={line.area} fill="rgb(var(--h-accent-rgb) / calc(0.15 * var(--h-accent-scale)))" />
 				<path d={line.path} fill="none" stroke="var(--h-accent-dim-text)" stroke-width={stroke} />
 			</svg>
 		{:else}
 			<EmptyState inline text={$lang('hearth_no_recorded_history_for_the_last')} />
 		{/if}
+	{:else if style === 'history' && segments?.length === 0}
+		<EmptyState inline text={$lang('hearth_no_recorded_history_for_the_last')} />
 	{:else if style === 'history'}
 		<div class="timeline" title={stateObj?.state}>
 			{#each segments ?? [] as segment, index (index)}
@@ -138,7 +141,7 @@
 					cy="32"
 					r={RADIUS}
 					fill="none"
-					stroke="rgb(var(--h-line-rgb) / 0.15)"
+					stroke="rgb(var(--h-line-rgb) / calc(0.15 * var(--h-line-scale)))"
 					stroke-width={stroke}
 				/>
 				<circle
@@ -157,11 +160,34 @@
 			<span class="reading">{value === null ? '-' : Math.round(value)}{unit || '%'}</span>
 		</div>
 	{/if}
-</div>
+{/snippet}
+{#if stateObj}
+	<button
+		type="button"
+		class="chart pressable"
+		class:radial={style === 'radial'}
+		onclick={() => openEntityDetail(entity)}
+	>
+		{@render content()}
+	</button>
+{:else}
+	<div class="chart" class:radial={style === 'radial'}>{@render content()}</div>
+{/if}
 
 <style>
 	.chart {
+		display: block;
+		width: 100%;
 		padding: 10px 0;
+		border: 0;
+		background: none;
+		font: inherit;
+		color: inherit;
+		text-align: left;
+	}
+
+	button.chart {
+		cursor: pointer;
 	}
 
 	.head {
@@ -196,11 +222,11 @@
 		margin-top: 10px;
 		border-radius: var(--h-radius-hair);
 		overflow: hidden;
-		background: rgb(var(--h-line-rgb) / 0.12);
+		background: rgb(var(--h-line-rgb) / calc(0.12 * var(--h-line-scale)));
 	}
 
 	.segment {
-		background: rgb(var(--h-line-rgb) / 0.2);
+		background: rgb(var(--h-line-rgb) / calc(0.2 * var(--h-line-scale)));
 	}
 
 	.segment.active {
@@ -211,7 +237,7 @@
 		height: 8px;
 		margin-top: 10px;
 		border-radius: var(--h-radius-hair);
-		background: rgb(var(--h-line-rgb) / 0.12);
+		background: rgb(var(--h-line-rgb) / calc(0.12 * var(--h-line-scale)));
 		overflow: hidden;
 	}
 

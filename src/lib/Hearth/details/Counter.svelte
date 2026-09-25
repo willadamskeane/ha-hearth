@@ -2,6 +2,7 @@
 	import { lang } from '$lib/core/i18n';
 	import { entityState } from '$lib/core/ha/entities';
 	import { callEntityService } from '$lib/core/ha/commands';
+	import { pressFeedback } from '../pressFeedback';
 
 	let { entity }: { entity: string } = $props();
 
@@ -16,7 +17,8 @@
 	<button
 		type="button"
 		class="step"
-		aria-label={$lang('hearth_decrement')}
+		use:pressFeedback={entity}
+		aria-label={$lang('hearth_decrease')}
 		disabled={typeof min === 'number' && Number(value) <= min}
 		onclick={() => callEntityService('counter', 'decrement', entity)}>-</button
 	>
@@ -24,7 +26,8 @@
 	<button
 		type="button"
 		class="step"
-		aria-label={$lang('hearth_increment')}
+		use:pressFeedback={entity}
+		aria-label={$lang('hearth_increase')}
 		disabled={typeof max === 'number' && Number(value) >= max}
 		onclick={() => callEntityService('counter', 'increment', entity)}>+</button
 	>
@@ -33,6 +36,7 @@
 	<button
 		type="button"
 		class="segment"
+		use:pressFeedback={entity}
 		onclick={() => callEntityService('counter', 'reset', entity)}
 	>
 		{$lang('hearth_reset')}

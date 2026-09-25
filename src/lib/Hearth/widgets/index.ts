@@ -65,9 +65,14 @@ export function isStripWidget(widget: RailWidget): boolean {
 	return widgetDescriptor(widget.type)?.strip === true;
 }
 
+/** Whether the widget is left out of the folded layout (`mobile: hidden`, or legacy `hide_mobile`). */
+export function hiddenOnMobile(widget: RailWidget): boolean {
+	return widget.mobile ? widget.mobile === 'hidden' : widget.hide_mobile === true;
+}
+
 /** Whether the narrow-layout status strip renders at all for this rail. */
 export function hasStripWidgets(rail: RailWidget[]): boolean {
-	return rail.some((widget) => isStripWidget(widget) && !widget.hide_mobile);
+	return rail.some((widget) => isStripWidget(widget) && !hiddenOnMobile(widget));
 }
 
 export function railWidgetNeedsConfiguration(widget: RailWidget): boolean {

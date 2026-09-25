@@ -31,6 +31,7 @@ export default defineConfig({
 			'@codemirror/language',
 			'@codemirror/legacy-modes',
 			'@codemirror/lint',
+			'@codemirror/merge',
 			'@codemirror/state',
 			'@codemirror/theme-one-dark',
 			'@codemirror/view',

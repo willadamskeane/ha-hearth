@@ -7,7 +7,7 @@
 	import { PRESS_RIPPLE } from './config';
 	import { SWATCH_COLORS } from '$lib/core/theme';
 	import { horizontalDrag } from './drag';
-	import { callEntityService, controlOverrides } from '$lib/core/ha/commands';
+	import { callEntityService, controlOverrides, markPending } from '$lib/core/ha/commands';
 	import {
 		hexToRgb,
 		lightViewForEntity,
@@ -16,6 +16,7 @@
 		setLightTemp
 	} from '$lib/core/domains/light';
 	import PopupSlider from './PopupSlider.svelte';
+	import { pressFeedback } from './pressFeedback';
 
 	let {
 		entity,
@@ -55,6 +56,12 @@
 		callLightService('turn_on', { effect });
 	}
 
+	// a preset is one discrete command, so it pulses like the other buttons
+	function selectPreset(level: number) {
+		setLightLevel(entity, level);
+		markPending(entity);
+	}
+
 	function swatchSelected(swatch: string) {
 		if (!view.colorCss) return false;
 		const current = view.colorCss.match(/\d+/g)?.map(Number);
@@ -78,10 +85,11 @@
 		<div
 			class="preset pressable"
 			use:Ripple={PRESS_RIPPLE}
-			onclick={() => setLightLevel(entity, preset)}
+			use:pressFeedback={entity}
+			onclick={() => selectPreset(preset)}
 			role="button"
 			tabindex="0"
-			onkeydown={(event) => activateOnKeyboard(event, () => setLightLevel(entity, preset))}
+			onkeydown={(event) => activateOnKeyboard(event, () => selectPreset(preset))}
 		>
 			{preset}%
 		</div>
@@ -115,6 +123,7 @@
 			<div
 				class="tab pressable"
 				class:active={mode === 'white'}
+				use:pressFeedback={entity}
 				onclick={selectWhite}
 				role="button"
 				tabindex="0"
@@ -148,6 +157,7 @@
 				class="swatch pressable"
 				class:selected={swatchSelected(swatch)}
 				style:background={swatch}
+				use:pressFeedback={entity}
 				onclick={() => setLightColor(entity, swatch)}
 				role="button"
 				tabindex="0"
@@ -169,6 +179,7 @@
 				class="effect-chip pressable"
 				class:active={currentEffect === effect}
 				use:Ripple={PRESS_RIPPLE}
+				use:pressFeedback={entity}
 				onclick={() => selectEffect(effect)}
 				role="button"
 				tabindex="0"
@@ -210,6 +221,7 @@
 		font-family: var(--h-font-mono);
 		font-size: var(--h-type-label);
 		letter-spacing: 2px;
+		text-transform: uppercase;
 		color: var(--h-label);
 	}
 

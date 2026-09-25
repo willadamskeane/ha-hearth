@@ -2,6 +2,7 @@
 	import { lang } from '$lib/core/i18n';
 	import { entityState } from '$lib/core/ha/entities';
 	import { callEntityService } from '$lib/core/ha/commands';
+	import { pressFeedback } from '../pressFeedback';
 
 	let { entity }: { entity: string } = $props();
 
@@ -38,6 +39,7 @@
 			<button
 				type="button"
 				class="segment active"
+				use:pressFeedback={entity}
 				disabled={inProgress}
 				onclick={() => callEntityService('update', 'install', entity)}
 				>{$lang('hearth_install')}</button
@@ -46,10 +48,11 @@
 		<button
 			type="button"
 			class="segment"
+			use:pressFeedback={entity}
 			onclick={() => callEntityService('update', 'skip', entity)}
 			>{$lang('hearth_skip_version')}</button
 		>
 	</div>
 {:else}
-	<div class="note">{$lang('hearth_up_to_date')}</div>
+	<div class="note">{$lang('update_up_to_date')}</div>
 {/if}

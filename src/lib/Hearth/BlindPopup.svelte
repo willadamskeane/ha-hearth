@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { lang } from '$lib/core/i18n';
-	import { activateOnKeyboard } from './interaction';
 	import { entityState } from '$lib/core/ha/entities';
 	import type { SliderUpdateMode } from '$lib/core/app/configuration';
 	import { getSupport } from '$lib/core/ha/entities';
@@ -8,11 +7,17 @@
 	import { PRESS_RIPPLE } from './config';
 	import {
 		blindPositionForEntity,
+		blindTiltForEntity,
+		coverIsAccessPoint,
+		guardCoverMotion,
 		setBlindPosition,
 		setBlindTiltPosition
 	} from '$lib/core/domains/cover';
-	import { callEntityService, controlOverrides } from '$lib/core/ha/commands';
+	import { callEntityService, controlOverrides, markPending } from '$lib/core/ha/commands';
+	import { requestConfirmation } from './store';
 	import PopupSlider from './PopupSlider.svelte';
+	import { pressFeedback } from './pressFeedback';
+	import './buttons.css';
 
 	let {
 		entity,
@@ -33,16 +38,29 @@
 		})
 	);
 
-	let tiltPosition = $derived(
-		Math.max(
-			0,
-			Math.min(
-				100,
-				$controlOverrides[`tilt:${entity}`] ??
-					Math.round(stateObj?.attributes?.current_tilt_position ?? 0)
-			)
-		)
-	);
+	let tiltPosition = $derived(blindTiltForEntity(entity, stateObj, $controlOverrides));
+	let position = $derived(blindPositionForEntity(entity, stateObj, $controlOverrides));
+	let accessPoint = $derived(coverIsAccessPoint(stateObj));
+
+	function moveTo(target: number, discrete = false) {
+		const current = blindPositionForEntity(entity, stateObj, {});
+		guardCoverMotion(
+			[entity],
+			target > current,
+			() => {
+				setBlindPosition(entity, target);
+				// a drag previews through its override; a button press pulses
+				if (discrete) markPending(entity);
+			},
+			requestConfirmation
+		);
+	}
+
+	// an access point's slider only commits on release, so it asks once per drag
+	function slide(value: number, commit?: boolean) {
+		setBlindPosition(entity, value, false);
+		if (commit) moveTo(value);
+	}
 
 	function callCoverService(service: string, data: Record<string, unknown> = {}) {
 		callEntityService('cover', service, entity, data);
@@ -52,45 +70,42 @@
 <PopupSlider
 	label={$lang('hearth_position')}
 	icon="blinds"
-	value={blindPositionForEntity(entity, stateObj, $controlOverrides)}
+	value={position}
 	variant="blue"
-	updateMode={sliderUpdates}
-	onchange={(value, commit) => setBlindPosition(entity, value, commit)}
+	updateMode={accessPoint ? 'release' : sliderUpdates}
+	onchange={slide}
 />
 
 <div class="buttons">
-	<div
-		class="button pressable"
+	<button
+		type="button"
+		class="hearth-button secondary pressable"
 		use:Ripple={PRESS_RIPPLE}
-		onclick={() => setBlindPosition(entity, 0)}
-		role="button"
-		tabindex="0"
-		onkeydown={(event) => activateOnKeyboard(event, () => setBlindPosition(entity, 0))}
+		use:pressFeedback={entity}
+		onclick={() => moveTo(0, true)}
 	>
-		{$lang('hearth_close')}
-	</div>
+		{$lang('hearth_close_cover')}
+	</button>
 	{#if supports?.STOP}
-		<div
-			class="button pressable"
+		<button
+			type="button"
+			class="hearth-button secondary pressable"
 			use:Ripple={PRESS_RIPPLE}
+			use:pressFeedback={entity}
 			onclick={() => callCoverService('stop_cover')}
-			role="button"
-			tabindex="0"
-			onkeydown={(event) => activateOnKeyboard(event, () => callCoverService('stop_cover'))}
 		>
 			{$lang('stop')}
-		</div>
+		</button>
 	{/if}
-	<div
-		class="button primary pressable"
+	<button
+		type="button"
+		class="hearth-button primary pressable"
 		use:Ripple={PRESS_RIPPLE}
-		onclick={() => setBlindPosition(entity, 100)}
-		role="button"
-		tabindex="0"
-		onkeydown={(event) => activateOnKeyboard(event, () => setBlindPosition(entity, 100))}
+		use:pressFeedback={entity}
+		onclick={() => moveTo(100, true)}
 	>
 		{$lang('hearth_open_fully')}
-	</div>
+	</button>
 </div>
 
 {#if supports?.SET_TILT_POSITION}
@@ -107,40 +122,37 @@
 {#if supports?.CLOSE_TILT || supports?.STOP_TILT || supports?.OPEN_TILT}
 	<div class="buttons">
 		{#if supports?.CLOSE_TILT}
-			<div
-				class="button pressable"
+			<button
+				type="button"
+				class="hearth-button secondary pressable"
 				use:Ripple={PRESS_RIPPLE}
+				use:pressFeedback={entity}
 				onclick={() => callCoverService('close_cover_tilt')}
-				role="button"
-				tabindex="0"
-				onkeydown={(event) => activateOnKeyboard(event, () => callCoverService('close_cover_tilt'))}
 			>
 				{$lang('hearth_close_tilt')}
-			</div>
+			</button>
 		{/if}
 		{#if supports?.STOP_TILT}
-			<div
-				class="button pressable"
+			<button
+				type="button"
+				class="hearth-button secondary pressable"
 				use:Ripple={PRESS_RIPPLE}
+				use:pressFeedback={entity}
 				onclick={() => callCoverService('stop_cover_tilt')}
-				role="button"
-				tabindex="0"
-				onkeydown={(event) => activateOnKeyboard(event, () => callCoverService('stop_cover_tilt'))}
 			>
 				{$lang('hearth_stop_tilt')}
-			</div>
+			</button>
 		{/if}
 		{#if supports?.OPEN_TILT}
-			<div
-				class="button primary pressable"
+			<button
+				type="button"
+				class="hearth-button primary pressable"
 				use:Ripple={PRESS_RIPPLE}
+				use:pressFeedback={entity}
 				onclick={() => callCoverService('open_cover_tilt')}
-				role="button"
-				tabindex="0"
-				onkeydown={(event) => activateOnKeyboard(event, () => callCoverService('open_cover_tilt'))}
 			>
 				{$lang('hearth_open_tilt')}
-			</div>
+			</button>
 		{/if}
 	</div>
 {/if}
@@ -152,22 +164,13 @@
 		margin-top: 16px;
 	}
 
-	.button {
+	.hearth-button {
 		flex: 1;
-		text-align: center;
-		padding: 16px;
-		border-radius: var(--h-radius-sm);
-		background: rgb(var(--h-surface-rgb) / calc(0.06 * var(--h-fill-scale)));
-		border: 1px solid rgb(var(--h-line-rgb) / calc(0.08 * var(--h-line-scale)));
-		font-size: var(--h-type-emphasis);
-		font-weight: 600;
-		color: var(--h-text-3);
-		cursor: pointer;
 	}
 
-	.button.primary {
+	/* covers keep the cool hue their slider uses */
+	.hearth-button.primary {
 		background: linear-gradient(135deg, rgb(var(--h-cool-rgb)), var(--h-cool-light));
-		border: none;
 		color: var(--h-on-cool);
 	}
 </style>

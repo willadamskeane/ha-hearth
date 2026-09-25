@@ -7,7 +7,10 @@
 		saveWithFeedback,
 		undoConfig
 	} from '../store';
+	import { states } from '$lib/core/ha/entities';
 	import { layerDepth } from '$lib/ui/layers';
+	import { FOLD_QUERY } from '../breakpoints';
+	import { searchAvailable } from '../visibility';
 
 	/** Global shortcuts: f for search, cmd/ctrl+s and cmd/ctrl+z while editing. */
 	let { onsearch }: { onsearch: () => void } = $props();
@@ -19,12 +22,12 @@
 		if (
 			!typing &&
 			!$hearthEditMode &&
-			$hearthConfig.rail.some((widget) => widget.type === 'search') &&
 			!$layerDepth &&
 			event.key === 'f' &&
 			!event.metaKey &&
 			!event.ctrlKey &&
-			!event.altKey
+			!event.altKey &&
+			searchAvailable($hearthConfig.rail, $states, window.matchMedia?.(FOLD_QUERY).matches ?? false)
 		) {
 			event.preventDefault();
 			onsearch();
@@ -33,8 +36,13 @@
 
 		if (!$hearthEditMode || !(event.metaKey || event.ctrlKey)) return;
 		// an open edit sheet owns these: saving would drop its unsubmitted form and
-		// undo would shift the card it is bound to out from under it
-		if ($editor) return;
+		// undo would shift the card it is bound to out from under it. A sheet that
+		// commits on Mod-s handles it before it gets here; otherwise the key still
+		// must not fall through to the browser's own save dialog.
+		if ($editor) {
+			if (event.key === 's') event.preventDefault();
+			return;
+		}
 		if (event.key === 's') {
 			event.preventDefault();
 			void saveWithFeedback();

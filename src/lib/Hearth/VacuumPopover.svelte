@@ -1,13 +1,14 @@
 <script lang="ts">
 	import { ICON } from './iconSizes';
-	import { lang } from '$lib/core/i18n';
+	import { lang, fill } from '$lib/core/i18n';
 	import { onDestroy } from 'svelte';
 	import Ripple from '$lib/ui/actions/ripple';
 	import { entityStates } from '$lib/core/ha/entities';
 	import { PRESS_RIPPLE, type VacuumModeRef } from './config';
 	import { getHearthInteractionMode } from './interaction';
 	import { callEntityService } from '$lib/core/ha/commands';
-	import { vacuumCommand } from '$lib/core/domains/vacuum';
+	import { vacuumActions, vacuumCommand, type VacuumAction } from '$lib/core/domains/vacuum';
+	import EmptyState from './EmptyState.svelte';
 	import Icon from './Icon.svelte';
 
 	let {
@@ -40,17 +41,10 @@
 	const statusKeys: Record<string, string> = {
 		docked: 'docked',
 		cleaning: 'cleaning',
-		returning: 'hearth_vacuum_returning_home',
+		returning: 'returning',
 		paused: 'paused',
 		idle: 'idle',
 		error: 'hearth_vacuum_needs_help'
-	};
-
-	type Action = {
-		command: 'start' | 'pause' | 'return_to_base';
-		label: string;
-		icon: string;
-		primary?: boolean;
 	};
 
 	function percent(value: unknown): number | null {
@@ -83,27 +77,13 @@
 	// tiles stay identical in height - the whole point of this layout
 	let showMeta = $derived(modes.some((mode) => mode.detail || mode.duration));
 
-	/** Only what applies to the current state; starting a run is the grid's job. */
-	let actions = $derived.by<Action[]>(() => {
-		switch (vacuum?.state) {
-			case 'cleaning':
-			case 'returning':
-				return [
-					{ command: 'pause', label: $lang('pause'), icon: 'pause' },
-					{ command: 'return_to_base', label: $lang('hearth_send_home'), icon: 'home' }
-				];
-			case 'paused':
-			case 'error':
-				return [
-					{ command: 'start', label: $lang('hearth_resume'), icon: 'play_arrow', primary: true },
-					{ command: 'return_to_base', label: $lang('hearth_send_home'), icon: 'home' }
-				];
-			case 'idle':
-				return [{ command: 'return_to_base', label: $lang('hearth_send_home'), icon: 'home' }];
-			default:
-				return [];
-		}
-	});
+	// the same commands as the detail sheet, less a plain start: starting a
+	// run is the mode grid's job
+	let actions = $derived(
+		vacuumActions(vacuum?.state, vacuum?.attributes?.supported_features ?? 0).filter(
+			(action) => action.label !== 'hearth_start'
+		)
+	);
 
 	let launched = $state<{ index: number; mode: VacuumModeRef } | null>(null);
 	let undoTimer: ReturnType<typeof setTimeout> | undefined;
@@ -123,7 +103,7 @@
 		vacuumCommand(entity, 'return_to_base');
 	}
 
-	function run(action: Action) {
+	function run(action: VacuumAction) {
 		if (readonly) return;
 		vacuumCommand(entity, action.command);
 	}
@@ -165,14 +145,18 @@
 		{/each}
 	</div>
 {:else}
-	<div class="empty">{$lang('hearth_add_cleaning_mode_button_entities_in')}</div>
+	<div class="empty">
+		<EmptyState text={$lang('hearth_add_cleaning_mode_button_entities_in')} />
+	</div>
 {/if}
 
 {#if launched}
 	<div class="undo">
 		<Icon name="check_circle" size={ICON.control} color="var(--h-good)" />
 		<div class="undo-text">
-			<div class="undo-title">{$lang('hearth_starting')} {modeName(launched.mode)}</div>
+			<div class="undo-title">
+				{fill($lang('hearth_starting'), { mode: modeName(launched.mode) })}
+			</div>
 			{#if modeMeta(launched.mode)}
 				<div class="undo-detail">{modeMeta(launched.mode)}</div>
 			{/if}
@@ -194,7 +178,7 @@
 				onclick={() => run(action)}
 			>
 				<Icon name={action.icon} size={ICON.control} fill={action.primary} />
-				{action.label}
+				{$lang(action.label)}
 			</button>
 		{/each}
 	</div>
@@ -259,6 +243,7 @@
 		font-family: var(--h-font-mono);
 		font-size: var(--h-type-caption);
 		letter-spacing: 1.2px;
+		text-transform: uppercase;
 	}
 
 	.name {
@@ -297,12 +282,6 @@
 
 	.empty {
 		margin-top: 16px;
-		padding: 16px;
-		border: 1px dashed rgb(var(--h-line-rgb) / calc(0.14 * var(--h-line-scale)));
-		border-radius: var(--h-radius-sm);
-		color: var(--h-text-6);
-		font-size: var(--h-type-small);
-		text-align: center;
 	}
 
 	.undo {

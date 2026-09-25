@@ -10,9 +10,11 @@
 		editor,
 		enterEditMode,
 		hearthConfig,
+		hasUnsavedEdits,
 		hearthEditMode,
 		hearthLoadError,
 		redoConfig,
+		reportCopy,
 		requestConfirmation,
 		saveState,
 		saveFailure,
@@ -21,11 +23,16 @@
 	} from '../store';
 	import Icon from '../Icon.svelte';
 
-	let { hideEditToggle = false, onsetup }: { hideEditToggle?: boolean; onsetup: () => void } =
-		$props();
+	let { hideEditToggle = false }: { hideEditToggle?: boolean } = $props();
 
+	// The YAML serializer pulls in js-yaml, which stays out of the eager bundle.
+	// Loading starts with the bar so the copy click does not wait on the
+	// network, which would cost Safari's user activation for the clipboard.
+	const transfer = import('../transfer');
+
+	// the same YAML document the code editor and Versions export
 	async function copySessionEdits() {
-		const text = JSON.stringify($hearthConfig, null, 2);
+		const text = (await transfer).configDocument($hearthConfig);
 		try {
 			if (navigator.clipboard) {
 				await navigator.clipboard.writeText(text);
@@ -36,13 +43,28 @@
 				area.style.opacity = '0';
 				document.body.append(area);
 				area.select();
-				document.execCommand('copy');
+				const copied = document.execCommand('copy');
 				area.remove();
+				if (!copied) throw new Error('copy command was refused');
 			}
+			reportCopy('copied');
 		} catch (error) {
 			console.error(error);
-			$saveState = 'error';
+			reportCopy('failed');
 		}
+	}
+
+	function cancel() {
+		if (!hasUnsavedEdits()) {
+			cancelEdit();
+			return;
+		}
+		requestConfirmation({
+			title: $lang('hearth_discard_edits_title'),
+			message: $lang('hearth_discard_edits_message'),
+			confirmLabel: $lang('hearth_discard'),
+			action: cancelEdit
+		});
 	}
 
 	function confirmOverwrite() {
@@ -90,14 +112,6 @@
 		{/if}
 		<button
 			type="button"
-			class="bar-icon setup pressable"
-			aria-label={$lang('hearth_setup')}
-			onclick={onsetup}
-		>
-			<Icon name="auto_awesome" size={ICON.control} />
-		</button>
-		<button
-			type="button"
 			class="bar-icon pressable"
 			aria-label={$lang('settings')}
 			onclick={() => editor.set({ kind: 'settings' })}
@@ -130,11 +144,8 @@
 		>
 			<Icon name="redo" size={ICON.control} />
 		</button>
-		<button
-			type="button"
-			class="bar-button pressable"
-			use:Ripple={PRESS_RIPPLE}
-			onclick={cancelEdit}>{$lang('cancel')}</button
+		<button type="button" class="bar-button pressable" use:Ripple={PRESS_RIPPLE} onclick={cancel}
+			>{$lang('cancel')}</button
 		>
 		<button
 			type="button"
@@ -195,7 +206,7 @@
 		border-radius: var(--h-radius-md);
 		background: linear-gradient(180deg, var(--h-sheet-0), var(--h-sheet-1));
 		border: 1px solid rgb(var(--h-accent-rgb) / calc(0.18 * var(--h-accent-scale)));
-		box-shadow: 0 20px 60px var(--h-scrim);
+		box-shadow: var(--h-shadow-toast);
 	}
 
 	.save-error {
@@ -241,30 +252,25 @@
 
 	.bar-button.dangerous {
 		color: var(--h-bad-text);
-		border-color: rgb(var(--h-bad-rgb) / 0.35);
+		border-color: rgb(var(--h-bad-rgb) / calc(0.35 * var(--h-accent-scale)));
 	}
-	/* where the rail folds away this corner is page content; PhoneNav carries the toggle */
+	/* see breakpoints.ts */
 	@media (max-width: 900px) {
+		/* where the rail folds away this corner is page content; the status
+		   strip or PhoneNav carries the toggle */
 		.edit-toggle {
 			display: none;
 		}
-	}
 
-	@media (max-width: 700px) {
 		.edit-bar {
-			left: 8px;
-			right: 8px;
+			left: calc(8px + env(safe-area-inset-left));
+			right: calc(8px + env(safe-area-inset-right));
 			bottom: calc(8px + env(safe-area-inset-bottom));
 			transform: none;
 			gap: 6px;
 			padding: 8px;
 			flex-wrap: wrap;
 			justify-content: flex-end;
-		}
-
-		/* the area import is a setup-time action; it lives in the settings sheet too */
-		.edit-bar .setup {
-			display: none;
 		}
 
 		.bar-button {

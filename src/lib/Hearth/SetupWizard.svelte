@@ -1,28 +1,58 @@
 <script lang="ts">
+	import LoadingState from './LoadingState.svelte';
+	import { get } from 'svelte/store';
 	import { ICON } from './iconSizes';
 	import { connection } from '$lib/core/ha/connection';
 	import { lang, fill } from '$lib/core/i18n';
 	import { states } from '$lib/core/ha/entities';
 	import Ripple from '$lib/ui/actions/ripple';
-	import { isStack, PRESS_RIPPLE, uniqueId, type HearthRoom } from './config';
+	import { PRESS_RIPPLE } from './config';
 	import Icon from './Icon.svelte';
-	import { buildProposal, type HearthProposal } from './proposal';
+	import EditSheet from './edit/EditSheet.svelte';
+	import './buttons.css';
+	import { applyImport, existingPageNames, pageNameKey, type ImportMode } from './importPlan';
+	import { buildProposal, type HearthProposal, type ProposedPage } from './proposal';
 	import { fetchRegistry } from '$lib/core/ha/registry';
-	import { hearthNeedsSetup, updateConfig } from './store';
-	import { layer } from '$lib/ui/layers';
+	import {
+		editor,
+		enterEditMode,
+		hearthConfig,
+		hearthEditMode,
+		hearthNeedsSetup,
+		requestConfirmation,
+		saveState,
+		saveWithFeedback,
+		updateConfig
+	} from './store';
 
-	let { onclose }: { onclose: () => void } = $props();
+	/** `firstRun` opened itself on an empty dashboard, so a stray backdrop tap must not dismiss it. */
+	let { onclose, firstRun = false }: { onclose: () => void; firstRun?: boolean } = $props();
 
 	let status = $state<'disconnected' | 'loading' | 'error' | 'ready'>('loading');
 	let errorMessage = $state('');
 	let proposal = $state<HearthProposal | null>(null);
 	let included = $state<Record<string, boolean>>({});
 	let includeGlanceables = $state(true);
+	let mode = $state<ImportMode>('replace');
 
-	let includedCount = $derived(proposal?.rooms.filter((room) => included[room.id]).length ?? 0);
+	// pages past the first one are what a replace would overwrite
+	let replacedCount = $derived(Math.max(0, $hearthConfig.rooms.length - 1));
+
+	let existingNames = $derived(existingPageNames($hearthConfig));
+
+	/** Pages whose area already has a dashboard page of the same name. */
+	function isExisting(page: ProposedPage) {
+		return existingNames.has(pageNameKey(page.room.name));
+	}
+
+	let selectablePages = $derived(
+		proposal?.pages.filter((page) => mode === 'replace' || !isExisting(page)) ?? []
+	);
+	let includedCount = $derived(selectablePages.filter((page) => included[page.room.id]).length);
 	let glanceableCount = $derived(
 		proposal?.glanceables.filter((widget) => widget.type !== 'label').length ?? 0
 	);
+	let canApply = $derived(includedCount > 0 || (includeGlanceables && glanceableCount > 0));
 
 	async function load() {
 		if (!$connection) {
@@ -33,7 +63,10 @@
 		try {
 			const snapshot = await fetchRegistry();
 			proposal = buildProposal(snapshot, $states ?? {});
-			included = Object.fromEntries(proposal.rooms.map((room) => [room.id, true]));
+			// an untouched dashboard has nothing worth keeping; one the user has
+			// already built on defaults to leaving those pages alone
+			mode = replacedCount > 0 ? 'add' : 'replace';
+			selectAll(true);
 			includeGlanceables = proposal.glanceables.length > 0;
 			status = 'ready';
 		} catch (error) {
@@ -51,101 +84,130 @@
 		if ($connection && status === 'disconnected') load();
 	});
 
+	function selectAll(value: boolean) {
+		if (!proposal) return;
+		included = Object.fromEntries(
+			proposal.pages.map((page) => [page.room.id, value && !(mode === 'add' && isExisting(page))])
+		);
+	}
+
 	function count(value: number, one: string, many: string) {
 		return fill($lang(value === 1 ? one : many), { count: String(value) });
 	}
 
-	/** Entity refs across a proposed page's cards, by the id suffix the proposal assigns. */
-	function cardEntities(room: HearthRoom, suffix: string) {
-		return room.cards
-			.flat()
-			.filter((item) => !isStack(item) && item.type === 'entities' && item.id.endsWith(suffix))
-			.flatMap((item) => (!isStack(item) && item.type === 'entities' ? item.entities : []));
+	const SUMMARY_KEYS: [keyof ProposedPage['counts'], string, string][] = [
+		['lights', 'hearth_one_light', 'hearth_n_lights'],
+		['covers', 'hearth_one_cover', 'hearth_n_covers'],
+		['climate', 'hearth_one_thermostat', 'hearth_n_thermostats'],
+		['media', 'hearth_one_media_player', 'hearth_n_media_players'],
+		['cameras', 'hearth_one_camera', 'hearth_n_cameras'],
+		['devices', 'hearth_one_device', 'hearth_n_devices']
+	];
+
+	function summarize(page: ProposedPage) {
+		return SUMMARY_KEYS.filter(([key]) => page.counts[key] > 0)
+			.map(([key, one, many]) => count(page.counts[key], one, many))
+			.join(', ');
 	}
 
-	function summarize(room: HearthRoom) {
-		const lighting = cardEntities(room, '-lighting').length;
-		const devices = cardEntities(room, '-devices').length;
-		return [
-			...(lighting ? [count(lighting, 'hearth_one_light', 'hearth_n_lights')] : []),
-			...(devices ? [count(devices, 'hearth_one_device', 'hearth_n_devices')] : [])
-		].join(', ');
-	}
-
-	function apply() {
+	function runImport() {
 		if (!proposal) return;
 		// unwrap the $state proxies - the config store gets structuredCloned on
 		// every later mutation and proxies cannot be structured-cloned
 		const plain = $state.snapshot(proposal) as HearthProposal;
-		const rooms = plain.rooms.filter((room) => included[room.id]);
-		updateConfig((config) => {
-			if (includeGlanceables) {
-				const takenWidgetIds = config.rail.map((widget) => widget.id);
-				for (const widget of plain.glanceables) {
-					const id = uniqueId(widget.id, takenWidgetIds);
-					takenWidgetIds.push(id);
-					config.rail.push({ ...widget, id });
-				}
-			}
-			// the first page (Home) is kept as it is; imported areas replace the rest
-			const kept = config.rooms.slice(0, 1);
-			// an area named like the kept page would otherwise duplicate its id, and
-			// with it the ids of the cards inside
-			const taken = kept.map((room) => room.id);
-			config.rooms = [
-				...kept,
-				...rooms.map((room) => {
-					const id = uniqueId(room.id, taken);
-					taken.push(id);
-					if (id === room.id) return room;
-					return {
-						...room,
-						id,
-						cards: room.cards.map((column) =>
-							column.map((item) => ({ ...item, id: item.id.replace(room.id, id) }))
-						)
-					};
-				})
-			];
-		});
+		const chosen = plain.pages.filter((page) => included[page.room.id]);
+		updateConfig((config) =>
+			applyImport(config, {
+				pages: chosen,
+				glanceables: includeGlanceables ? plain.glanceables : [],
+				mode
+			})
+		);
 		hearthNeedsSetup.set(false);
+		// outside edit mode nothing else would persist the import, and a reload
+		// would silently drop it
+		if (!get(hearthEditMode)) void persist();
+		// opened from the settings sheet, which would otherwise cover the new pages
+		editor.set(null);
 		onclose();
+	}
+
+	async function persist() {
+		await saveWithFeedback();
+		// only the edit bar reports a failed or conflicting save, and it is the
+		// only way to retry one - so hand the still-unsaved import over to it
+		if (get(saveState) !== 'saved') enterEditMode();
+	}
+
+	function apply() {
+		if (mode === 'replace' && replacedCount > 0) {
+			requestConfirmation({
+				title: $lang('hearth_setup'),
+				message: fill($lang('hearth_import_replace_confirm'), { count: String(replacedCount) }),
+				confirmLabel: $lang('hearth_apply'),
+				action: runImport
+			});
+			return;
+		}
+		runImport();
 	}
 </script>
 
-<div
-	class="overlay"
-	role="presentation"
-	onpointerdown={(event) => event.target === event.currentTarget && onclose()}
-	use:layer={onclose}
+<EditSheet
+	title={$lang('hearth_setup')}
+	{onclose}
+	ondone={apply}
+	doneLabel={$lang('hearth_apply')}
+	doneDisabled={status !== 'ready' || !canApply}
+	dismissible={!firstRun}
 >
-	<div class="panel" role="dialog" aria-modal="true" aria-label={$lang('hearth_import')}>
-		<div class="header">
-			<span class="title">{$lang('hearth_import')}</span>
-			<button
-				type="button"
-				class="icon-button"
-				aria-label={$lang('hearth_close')}
-				onclick={onclose}
-			>
-				<Icon name="close" size={ICON.control} />
-			</button>
-		</div>
+	<div class="wizard">
 		<p class="intro">
 			{$lang('hearth_import_intro')}
 		</p>
 		{#if status === 'disconnected'}
 			<div class="hint">{$lang('hearth_not_connected')}</div>
 		{:else if status === 'loading'}
-			<div class="hint">{$lang('hearth_loading_registries')}</div>
+			<LoadingState text={$lang('hearth_loading_registries')} />
 		{:else if status === 'error'}
 			<div class="hint">
-				<span class="error">{errorMessage}</span>
-				<button type="button" class="bar-button pressable" use:Ripple={PRESS_RIPPLE} onclick={load}
-					>{$lang('hearth_retry')}</button
+				<div class="error" role="alert">
+					<strong>{$lang('hearth_registries_failed')}</strong>
+					<span class="error-detail">{errorMessage}</span>
+				</div>
+				<button
+					type="button"
+					class="hearth-button secondary pressable"
+					use:Ripple={PRESS_RIPPLE}
+					onclick={load}>{$lang('hearth_retry')}</button
 				>
 			</div>
 		{:else if proposal}
+			{#if replacedCount > 0}
+				<div class="modes" role="radiogroup" aria-label={$lang('hearth_import_mode')}>
+					{#each [['add', 'hearth_import_mode_add'], ['replace', 'hearth_import_mode_replace']] as [value, label] (value)}
+						<button
+							type="button"
+							role="radio"
+							class="mode pressable"
+							aria-checked={mode === value}
+							class:selected={mode === value}
+							use:Ripple={PRESS_RIPPLE}
+							onclick={() => {
+								mode = value as ImportMode;
+								selectAll(true);
+							}}
+						>
+							{$lang(label)}
+						</button>
+					{/each}
+				</div>
+				<p class="mode-note">
+					{mode === 'replace'
+						? fill($lang('hearth_import_replaces_pages'), { count: String(replacedCount) })
+						: $lang('hearth_import_keeps_pages')}
+				</p>
+			{/if}
 			{#if proposal.glanceables.length}
 				<label class="row glanceables">
 					<input type="checkbox" bind:checked={includeGlanceables} />
@@ -158,90 +220,122 @@
 					</span>
 				</label>
 			{/if}
+			{#if selectablePages.length > 1}
+				<div class="bulk">
+					<button type="button" class="link" onclick={() => selectAll(true)}
+						>{$lang('hearth_select_all')}</button
+					>
+					<button type="button" class="link" onclick={() => selectAll(false)}
+						>{$lang('none')}</button
+					>
+				</div>
+			{/if}
 			<div class="list">
-				{#each proposal.rooms as room (room.id)}
+				{#each selectablePages as page, index (page.room.id)}
+					{#if page.floorName && page.floorName !== selectablePages[index - 1]?.floorName}
+						<div class="floor">{page.floorName}</div>
+					{/if}
 					<label class="row">
-						<input type="checkbox" bind:checked={included[room.id]} />
-						<span class="row-icon"><Icon name={room.icon} size={ICON.control} /></span>
+						<input type="checkbox" bind:checked={included[page.room.id]} />
+						<span class="row-icon"><Icon name={page.room.icon} size={ICON.control} /></span>
 						<span class="row-text">
-							<span class="row-name">{room.name}</span>
-							<span class="row-summary">{summarize(room)}</span>
+							<span class="row-name">{page.room.name}</span>
+							<span class="row-summary">{summarize(page)}</span>
 						</span>
 					</label>
 				{:else}
-					<div class="hint">{$lang('hearth_no_areas')}</div>
+					<div class="hint">
+						{mode === 'add' && proposal.pages.length
+							? $lang('hearth_no_new_areas')
+							: $lang('hearth_no_areas')}
+					</div>
 				{/each}
 			</div>
 		{/if}
-		<div class="footer">
-			<button type="button" class="bar-button pressable" use:Ripple={PRESS_RIPPLE} onclick={onclose}
-				>{$lang('cancel')}</button
+		{#if firstRun}
+			<button
+				type="button"
+				class="hearth-button secondary skip pressable"
+				use:Ripple={PRESS_RIPPLE}
+				onclick={onclose}>{$lang('hearth_skip_for_now')}</button
 			>
-			{#if status === 'ready'}
-				<button
-					type="button"
-					class="bar-button primary pressable"
-					disabled={!includedCount && !(includeGlanceables && glanceableCount)}
-					use:Ripple={PRESS_RIPPLE}
-					onclick={apply}
-				>
-					{$lang('hearth_apply')}
-				</button>
-			{/if}
-		</div>
+		{/if}
 	</div>
-</div>
+</EditSheet>
 
 <style>
-	.overlay {
-		position: fixed;
-		inset: 0;
-		z-index: var(--h-layer-confirm);
-		background: var(--h-overlay);
-		backdrop-filter: var(--h-overlay-blur, blur(8px));
-		display: flex;
-		align-items: center;
-		justify-content: center;
-	}
-
-	.panel {
-		width: 480px;
-		max-width: calc(100vw - 40px);
-		max-height: calc(100vh - 80px);
+	.wizard {
+		grid-column: 1 / -1;
 		display: flex;
 		flex-direction: column;
-		background: linear-gradient(180deg, var(--h-sheet-0), var(--h-sheet-1));
-		border: 1px solid rgb(var(--h-accent-rgb) / calc(0.18 * var(--h-accent-scale)));
-		border-radius: var(--h-radius-xl);
-		padding: 20px 22px;
-		box-shadow: 0 40px 100px var(--h-scrim);
 	}
 
-	.header {
+	.skip {
+		align-self: flex-end;
+		margin-top: 14px;
+	}
+
+	.modes {
 		display: flex;
-		align-items: center;
-		justify-content: space-between;
+		gap: 6px;
+		padding: 4px;
+		border-radius: var(--h-radius-sm);
+		background: rgb(var(--h-surface-rgb) / calc(0.06 * var(--h-fill-scale)));
 	}
 
-	.title {
-		font-size: var(--h-type-subtitle);
+	.mode {
+		flex: 1;
+		padding: 8px 12px;
+		border: 0;
+		border-radius: var(--h-radius-xs);
+		background: none;
+		color: var(--h-text-4);
+		font-family: inherit;
+		font-size: var(--h-type-secondary);
 		font-weight: 600;
-		color: var(--h-text-1);
+		cursor: pointer;
 	}
 
-	.icon-button {
+	.mode.selected {
+		background: rgb(var(--h-surface-rgb) / calc(0.12 * var(--h-fill-scale)));
+		color: var(--h-text-2);
+	}
+
+	.mode-note {
+		margin: 8px 2px 4px;
+		font-size: var(--h-type-small);
+		color: var(--h-text-5);
+	}
+
+	.bulk {
 		display: flex;
-		color: var(--h-icon);
-		cursor: pointer;
+		justify-content: flex-end;
+		gap: 14px;
+		padding: 6px 10px 2px;
+	}
+
+	.link {
 		border: 0;
 		background: none;
 		padding: 0;
+		color: var(--h-text-5);
+		font-family: inherit;
+		font-size: var(--h-type-small);
+		cursor: pointer;
 	}
 
-	.icon-button:hover {
+	.link:hover {
 		color: var(--h-text-3);
 	}
 
+	.floor {
+		padding: 10px 10px 4px;
+		font-size: var(--h-type-small);
+		font-weight: 600;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--h-text-6);
+	}
 	.intro {
 		margin: 10px 0 14px;
 		font-size: var(--h-type-secondary);
@@ -250,9 +344,6 @@
 	}
 
 	.list {
-		flex: 1;
-		min-height: 80px;
-		overflow-y: auto;
 		margin: 0 -6px;
 		padding: 0 6px;
 	}
@@ -314,38 +405,15 @@
 	}
 
 	.error {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
 		color: var(--h-bad-text);
 	}
 
-	.footer {
-		display: flex;
-		justify-content: flex-end;
-		gap: 10px;
-		margin-top: 14px;
-	}
-
-	.bar-button {
-		padding: 10px 20px;
-		border-radius: var(--h-radius-xs);
-		font-size: var(--h-type-body);
-		font-weight: 600;
-		cursor: pointer;
-		color: var(--h-text-3);
-		background: rgb(var(--h-surface-rgb) / calc(0.06 * var(--h-fill-scale)));
-		border: 1px solid rgb(var(--h-line-rgb) / calc(0.08 * var(--h-line-scale)));
-		user-select: none;
-		-webkit-user-select: none;
-		font-family: inherit;
-	}
-
-	.bar-button.primary {
-		background: linear-gradient(135deg, var(--h-accent-deep), var(--h-accent-bright));
-		border: none;
-		color: var(--h-on-accent);
-	}
-
-	.bar-button:disabled {
-		opacity: 0.5;
-		pointer-events: none;
+	.error-detail {
+		font-size: var(--h-type-small);
+		color: var(--h-text-5);
+		overflow-wrap: anywhere;
 	}
 </style>

@@ -12,29 +12,50 @@
 		hearthEditMode,
 		hearthLoadError,
 		hearthNeedsSetup,
-		popup
+		popup,
+		setupWizardOpen
 	} from './store';
+	import { railSlots, type RailWidget } from './config';
+	import { mediaQueriesIn, railWidgetShown } from './visibility';
 	import ControlPopup from './ControlPopup.svelte';
+	import EmptyState from './EmptyState.svelte';
 	import Rail from './Rail.svelte';
 	import RoomDetail from './RoomDetail.svelte';
 	import Screensaver from './Screensaver.svelte';
 	import SearchOverlay from './SearchOverlay.svelte';
-	import SetupWizard from './SetupWizard.svelte';
 	import ConfirmDialog from './shell/ConfirmDialog.svelte';
 	import EditBar from './shell/EditBar.svelte';
 	import Keyboard from './shell/Keyboard.svelte';
 	import PhoneNav from './shell/PhoneNav.svelte';
 	import StatusStrip from './shell/StatusStrip.svelte';
-	import { isStripWidget } from './widgets';
+	import { hasStripWidgets, isStripWidget } from './widgets';
 	import ThemeStyle from './shell/ThemeStyle.svelte';
 	import Toasts from './shell/Toasts.svelte';
+	import NavWidget from './widgets/nav/Widget.svelte';
+	import type { NavWidget as NavWidgetConfig } from './widgets/nav/descriptor';
 	import { wakeLock } from './wakeLock';
 	import ScrollEdge from '$lib/ui/ScrollEdge.svelte';
 	import { scrollEdges, type ScrollEdges } from '$lib/ui/actions/scrollEdges';
 	import { suppressScrollTaps } from '$lib/ui/scrollGuard';
+	import { mediaQuery } from '$lib/ui/mediaQuery';
+	import { FOLD_QUERY, SHORT_QUERY } from './breakpoints';
 
-	let showSetupWizard = $state(false);
 	let showSearch = $state(false);
+
+	// search belongs to the running dashboard; every way of asking for it
+	// (rail widget, page switcher, f key) goes through here
+	function openSearch() {
+		if (!$hearthEditMode) showSearch = true;
+	}
+
+	// the folded layout is a different tree, not a restyled one: the rail
+	// splits into the run above the page and the run below it, so which one
+	// to build has to be decided in script rather than in a media query
+	const narrow = mediaQuery(FOLD_QUERY);
+
+	// a phone held sideways has no height to spend before the page, so nothing
+	// rides above it there unless a widget asked for that slot by name
+	const shortScreen = mediaQuery(SHORT_QUERY);
 
 	// the columns hide their scrollbars, so a blurred edge is the only sign
 	// that the list keeps going. Which column scrolls depends on the fold:
@@ -88,10 +109,54 @@
 		if (activeRoomId && activeRoomId !== $currentRoom) currentRoom.set(activeRoomId);
 	});
 
+	// a page opens at its own top: whichever box scrolls, the offset left over
+	// from the previous page means nothing on this one
+	let layoutElement = $state<HTMLElement | undefined>();
+	let scrolledRoom = '';
+
+	$effect(() => {
+		if (activeRoomId === scrolledRoom) return;
+		scrolledRoom = activeRoomId;
+		layoutElement?.scrollTo({ top: 0 });
+		mainElement?.scrollTo({ top: 0 });
+	});
+
+	/*
+	 * Pages stay reachable on every layout. The folded layout always has the
+	 * page switcher; a wide rail whose nav widget was removed or is hidden by
+	 * its visibility conditions gets the same page list built in, above the
+	 * rest of the rail. The nav widget's own settings shape only the wide rail.
+	 */
+	const BUILT_IN_NAV: NavWidgetConfig = { id: 'built-in-nav', type: 'nav' };
+	// live results for the rail's media conditions, so a resize that hides the
+	// nav widget brings the built-in list back like VisibilityGate hides the widget
+	let railMedia = $state<Record<string, boolean>>({});
+	$effect(() => {
+		const queries = new Set($hearthConfig.rail.flatMap((w) => mediaQueriesIn(w.visibility ?? [])));
+		const matches: Record<string, boolean> = {};
+		const stops = [...queries].map((query) =>
+			mediaQuery(query).subscribe((value) => {
+				matches[query] = value;
+				railMedia = { ...matches };
+			})
+		);
+		return () => stops.forEach((stop) => stop());
+	});
+	let railHasNav = $derived(
+		$hearthEditMode
+			? $hearthConfig.rail.some((widget) => widget.type === 'nav')
+			: railWidgetShown($hearthConfig.rail, 'nav', $states, {
+					narrow: false,
+					match: (query) => railMedia[query] ?? false
+				})
+	);
+
 	// display-only theme override via ?theme=<preset id>: the matched preset
 	// entry (theme null = default look) replaces the stored theme without
-	// touching the config or undo history
-	let presetOverride = $state<{ theme: HearthTheme | null } | undefined>(undefined);
+	// touching the config or undo history. It would mask theme edits, so it
+	// steps aside while editing and returns when editing ends.
+	let urlPreset = $state<{ theme: HearthTheme | null } | undefined>(undefined);
+	let presetOverride = $derived($hearthEditMode ? undefined : urlPreset);
 
 	// ?menu=false hides the edit-toggle pencil for kiosk frames; edit mode
 	// stays reachable if already active, it just can't be entered from here
@@ -104,7 +169,7 @@
 	let configIds = $derived(configEntityIds($hearthConfig, $allEntityIds));
 	$effect(() => {
 		const scope =
-			$hearthEditMode || showSearch || showSetupWizard || !$allEntityIds.length
+			$hearthEditMode || showSearch || $setupWizardOpen || !$allEntityIds.length
 				? null
 				: dashboardEntityScope(configIds, $allEntityIds, $states, [$popup?.entity]);
 		const current = get(entityScope);
@@ -115,22 +180,51 @@
 	let perfParam = $state(false);
 	let perfOverlay = $derived(perfParam || $hearthConfig.perf_overlay === true);
 
-	// where the rail folds away, its navigation moves to PhoneNav and its
-	// glanceable widgets to StatusStrip; if nothing else is left, the folded
-	// rail below the page is empty chrome
-	const FOLDED_STRUCTURE = new Set(['label', 'spacer', 'nav']);
-	let railFolds = $derived(
-		$hearthConfig.rail.every(
-			(widget) => widget.hide_mobile || isStripWidget(widget) || FOLDED_STRUCTURE.has(widget.type)
-		)
+	// where the rail folds, its navigation moves to PhoneNav and its glanceable
+	// widgets to StatusStrip, so outside edit mode a folded run leaves those
+	// out; a run of nothing but structure would be empty chrome, so it is not
+	// drawn at all. A phone held sideways has no height for the strip, so there
+	// the glance widgets fold into the runs instead.
+	let useStrip = $derived(!$shortScreen);
+	let stripShown = $derived(useStrip && hasStripWidgets($hearthConfig.rail));
+	const FOLDED_STRUCTURE = new Set<RailWidget['type']>(['label', 'spacer', 'nav', 'search']);
+	let foldedRuns = $derived(
+		railSlots($hearthConfig.rail, { includeHidden: $hearthEditMode, compact: $shortScreen })
 	);
+	function drawnInRun(run: RailWidget[]): number {
+		if ($hearthEditMode) return run.length;
+		return run.filter(
+			(widget) => !(useStrip && isStripWidget(widget)) && !FOLDED_STRUCTURE.has(widget.type)
+		).length;
+	}
+	let leadingWidgets = $derived(drawnInRun(foldedRuns.top));
+	let trailingWidgets = $derived(drawnInRun(foldedRuns.bottom));
+
+	/*
+	 * The page on screen is kept in ?room= so a reload or a shared link lands
+	 * on it. Replaced, never pushed: back closes overlays, it does not walk
+	 * through pages. Other parameters and the hash are kept as they are. It
+	 * also runs on popstate, since back from an overlay lands on the entry the
+	 * overlay opened over, whose address can predate a page change since.
+	 */
+	let roomParamRead = $state(false);
+
+	function syncRoomParam() {
+		if (!roomParamRead || !activeRoomId) return;
+		const url = new URL(location.href);
+		if (url.searchParams.get('room') === activeRoomId) return;
+		url.searchParams.set('room', activeRoomId);
+		history.replaceState(history.state, '', url.pathname + url.search + url.hash);
+	}
+
+	$effect(syncRoomParam);
 
 	onMount(() => {
 		const params = new URLSearchParams(location.search);
-		if ($hearthNeedsSetup && !$hearthLoadError) showSetupWizard = true;
+		if ($hearthNeedsSetup && !$hearthLoadError) setupWizardOpen.set(true);
 
 		const presetId = params.get('theme');
-		presetOverride = THEME_PRESETS.find((preset) => preset.id === presetId);
+		urlPreset = THEME_PRESETS.find((preset) => preset.id === presetId);
 
 		const roomId = params.get('room');
 		if (roomId && $hearthConfig.rooms.some((room) => room.id === roomId)) {
@@ -139,50 +233,89 @@
 
 		hideEditToggle = params.get('menu') === 'false';
 		perfParam = params.get('perf') === '1';
+		roomParamRead = true;
 	});
 
-	// the override would mask theme edits, so drop it while editing
-	$effect(() => {
-		if ($hearthEditMode) presetOverride = undefined;
-	});
-
-	// the search overlay only opens outside edit mode; entering edit mode
-	// while it happens to be open (not reachable via the UI today, but cheap
-	// to guard) closes it rather than leaving it stranded above the edit bar
+	// search only opens outside edit mode (see openSearch); should edit mode
+	// start while it is open anyway, it closes rather than staying stranded
+	// above the edit bar
 	$effect(() => {
 		if ($hearthEditMode) showSearch = false;
 	});
 </script>
 
-<Keyboard onsearch={() => (showSearch = true)} />
+<svelte:window onpopstate={syncRoomParam} />
+<Keyboard onsearch={openSearch} />
 <ThemeStyle {presetOverride} />
+
+{#snippet pageColumn()}
+	<div class="main-wrap">
+		<main
+			class="main"
+			class:fill={activeRoom?.fill_screen}
+			bind:this={mainElement}
+			use:scrollEdges={{ report: (edges) => (mainCut = edges) }}
+		>
+			{#if $hearthNeedsSetup && !$hearthLoadError && !$hearthEditMode && !$setupWizardOpen}
+				<div class="setup-prompt">
+					<EmptyState
+						icon="auto_awesome"
+						text={$lang('hearth_setup_prompt')}
+						hint={$lang('hearth_setup_prompt_hint')}
+						action={{ label: $lang('hearth_setup'), onclick: () => setupWizardOpen.set(true) }}
+					/>
+				</div>
+			{/if}
+			<RoomDetail roomId={activeRoomId} fillScreen={activeRoom?.fill_screen ?? false} />
+		</main>
+		{#if edgeBlur}
+			<ScrollEdge edge="top" size={96} active={mainCut.top} />
+			<ScrollEdge edge="bottom" size={96} active={mainCut.bottom} />
+		{/if}
+	</div>
+{/snippet}
 
 <section class="frame" use:wakeLock={$hearthConfig.keep_screen_on ?? true} use:suppressScrollTaps>
 	<div
 		class="layout"
 		class:editing={$hearthEditMode}
-		class:rail-folds={railFolds && !$hearthEditMode}
+		class:narrow={$narrow}
+		bind:this={layoutElement}
 		use:scrollEdges={{ report: (edges) => (layoutCut = edges) }}
 	>
-		<StatusStrip {hideEditToggle} />
-		<PhoneNav onsearch={() => (showSearch = true)} {hideEditToggle} />
-		<div class="rail-scroll">
-			<Rail onsearch={() => (showSearch = true)} />
-		</div>
-		<div class="main-wrap">
-			<main
-				class="main"
-				class:fill={activeRoom?.fill_screen}
-				bind:this={mainElement}
-				use:scrollEdges={{ report: (edges) => (mainCut = edges) }}
-			>
-				<RoomDetail roomId={activeRoomId} fillScreen={activeRoom?.fill_screen ?? false} />
-			</main>
-			{#if edgeBlur}
-				<ScrollEdge edge="top" size={96} active={mainCut.top} />
-				<ScrollEdge edge="bottom" size={96} active={mainCut.bottom} />
+		<StatusStrip {hideEditToggle} enabled={useStrip} />
+		<PhoneNav onsearch={openSearch} {hideEditToggle} {stripShown} />
+		{#if $narrow}
+			{#if leadingWidgets > 0}
+				<div class="rail-run">
+					<Rail
+						mobileSlot="top"
+						compact={$shortScreen}
+						omitStrip={useStrip}
+						onsearch={openSearch}
+					/>
+				</div>
 			{/if}
-		</div>
+			{@render pageColumn()}
+			{#if $hearthEditMode || trailingWidgets > 0}
+				<div class="rail-run trailing">
+					<Rail
+						mobileSlot="bottom"
+						compact={$shortScreen}
+						omitStrip={useStrip}
+						onsearch={openSearch}
+					/>
+				</div>
+			{/if}
+		{:else}
+			<div class="rail-scroll">
+				{#if !railHasNav}
+					<NavWidget widget={BUILT_IN_NAV} />
+				{/if}
+				<Rail onsearch={openSearch} />
+			</div>
+			{@render pageColumn()}
+		{/if}
 	</div>
 	{#if edgeBlur}
 		<ScrollEdge edge="top" size={96} active={layoutCut.top} />
@@ -208,12 +341,18 @@
 	{#if ($hearthConfig.screensaver_minutes ?? 0) > 0}
 		<Screensaver minutes={$hearthConfig.screensaver_minutes} />
 	{/if}
-	{#if showSetupWizard}
-		<SetupWizard onclose={() => (showSetupWizard = false)} />
+	{#if $setupWizardOpen}
+		<!-- the import is rare (first run, or from Settings), so it loads when asked for -->
+		{#await import('./SetupWizard.svelte') then SetupWizard}
+			<SetupWizard.default
+				firstRun={$hearthNeedsSetup}
+				onclose={() => setupWizardOpen.set(false)}
+			/>
+		{/await}
 	{/if}
 	<ConfirmDialog />
 	<Toasts {overflowBy} />
-	<EditBar {hideEditToggle} onsetup={() => (showSetupWizard = true)} />
+	<EditBar {hideEditToggle} />
 	{#if perfOverlay}
 		<!-- diagnostics load only when asked for -->
 		{#await import('./shell/PerfHud.svelte') then PerfHud}
@@ -223,9 +362,19 @@
 </section>
 
 <style>
+	.setup-prompt {
+		margin-bottom: 16px;
+	}
+
 	/* command sent, waiting for the entity to confirm */
 	.frame :global(.pending) {
-		animation: hearth-pending 1.1s ease-in-out infinite;
+		animation: hearth-pending 1.1s ease-in-out infinite; /* literal ok: pulse period, not a transition */
+	}
+
+	/* reduced motion keeps a still cue in place of the pulse */
+	:global(html[data-motion='off']) .frame :global(.pending) {
+		animation: none;
+		opacity: 0.7;
 	}
 
 	:global(html.low-power) .frame :global(.pending) {
@@ -278,6 +427,11 @@
 		transform: scale(0.985);
 		filter: none;
 		transition: transform var(--h-motion-fast) ease;
+	}
+
+	/* the glow stays as press feedback; only the scale moves */
+	:global(html[data-motion='off']) .frame :global(.pressable:active) {
+		transform: none;
 	}
 
 	@keyframes -global-hearth-pending {
@@ -358,58 +512,84 @@
 		outline-offset: 2px;
 	}
 
-	@media (max-width: 900px) {
-		/* edge to edge: only the user's own padding and the device's safe area */
-		.layout {
-			grid-template-columns: 1fr;
-			padding: calc(var(--h-pad-y) + env(safe-area-inset-top)) var(--h-pad-x)
-				calc(var(--h-pad-y) + env(safe-area-inset-bottom));
-			gap: 24px;
-			overflow-y: auto;
-			/* a short page must not stretch the strip and tab rows to fill the screen */
-			align-content: start;
-		}
-
-		/* the edit bar floats over the scroll container; leave room under the
-		   last widget so nothing hides behind it */
-		.layout.editing {
-			padding-bottom: calc(
-				112px + var(--h-pad-y) + env(safe-area-inset-bottom)
-			); /* literal ok: edit bar height plus margin */
-		}
-
-		/* the glow bleed shrinks to the layout's own padding so the columns end
-		   at the viewport edge instead of 8px past it */
-		.rail-scroll,
-		.main-wrap,
-		.main {
-			overflow-y: visible;
-			min-height: auto;
-			height: auto;
-			padding: 0;
-			margin: 0;
-		}
-
-		.rail-scroll {
-			padding-bottom: 80px; /* literal ok: toggle height plus margin */
-		}
-
-		.layout.rail-folds .rail-scroll {
-			display: none;
-		}
-
-		/* On short wall tablets the active page is the primary glance surface;
-		   the rail follows it instead of consuming the entire first viewport. */
-		.main {
-			order: 1;
-		}
-
-		.main.fill {
-			overflow-y: visible;
-		}
-
-		.rail-scroll {
-			order: 2;
-		}
+	/*
+	 * A text field drawn as a framed row (search box, stepper, icon filter) is
+	 * the frame, not the bare input inside it: a ring around the input traces a
+	 * square box within a rounded one. The ring moves out to the frame, which
+	 * is what the field looks like. Buttons sharing the row keep their own.
+	 */
+	.frame :global(.field-frame:has(:is(input, textarea):focus-visible)) {
+		outline: var(--h-focus-ring);
+		outline-offset: 2px;
 	}
+
+	.frame :global(.field-frame :is(input, textarea):focus-visible) {
+		outline: none;
+	}
+
+	/*
+	 * Folded layout (see breakpoints.ts). The rail leaves its column and
+	 * becomes two runs in the page flow, so this is a different tree, not a
+	 * restyled one - the class comes from the same query in script.
+	 */
+	.layout.narrow {
+		display: flex;
+		flex-direction: column;
+		/* the same shape as the wide layout's padding: a base the user's own
+		   padding adds to, plus the device's safe area, which a landscape notch
+		   makes a horizontal concern too. Published so the page switcher can
+		   bleed back out to the screen edge. */
+		--h-fold-pad-left: calc(16px + var(--h-pad-x) + env(safe-area-inset-left));
+		--h-fold-pad-right: calc(16px + var(--h-pad-x) + env(safe-area-inset-right));
+		/* no padding above: the page switcher pins to the very top of this
+		   scroller and carries the top inset itself, so nothing can scroll
+		   through the strip of screen above it */
+		padding: 0 var(--h-fold-pad-right) calc(16px + var(--h-pad-y) + env(safe-area-inset-bottom))
+			var(--h-fold-pad-left);
+		gap: 24px;
+		overflow-y: auto;
+		/* a dashboard never scrolls sideways: a tile glow or a widened hit area
+		   reaching past the glass is a few stray pixels, not a second axis */
+		overflow-x: hidden;
+		/* the page switcher is sticky over this box; anything scrolled to would
+		   otherwise land underneath it */
+		scroll-padding-top: calc(
+			72px + env(safe-area-inset-top)
+		); /* literal ok: page switcher height plus margin */
+		/* inside the Home Assistant app this scroller sits in a webview that
+		   scrolls too - keep the rubber band here */
+		overscroll-behavior-y: contain;
+	}
+
+	/* the edit bar floats over the scroll container; leave room under the
+	   last widget so nothing hides behind it */
+	.layout.narrow.editing {
+		padding-bottom: calc(
+			112px + var(--h-pad-y) + env(safe-area-inset-bottom)
+		); /* literal ok: edit bar height plus margin */
+	}
+
+	/* the glow bleed shrinks to the layout's own padding so the columns end
+	   at the viewport edge instead of 8px past it */
+	.layout.narrow .main-wrap,
+	.layout.narrow .main {
+		overflow-y: visible;
+		min-height: auto;
+		height: auto;
+		padding: 0;
+		margin: 0;
+	}
+
+	.layout.narrow .main.fill {
+		overflow-y: visible;
+	}
+
+	.rail-run {
+		display: flex;
+		flex-direction: column;
+		min-width: 0;
+	}
+
+	/* no room for a floating edit toggle here: where the layout folds, the
+	   status strip or the page switcher carries it (see EditBar) */
 </style>

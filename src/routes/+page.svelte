@@ -9,18 +9,25 @@
 	import { disposeHaptics, haptics, startPressFeedback } from '$lib/core/app/haptics';
 	import { motion } from '$lib/core/app/motion';
 	import { applyPerformanceMode, resolveLowPower } from '$lib/core/app/performance';
-	import { connected } from '$lib/core/ha/connection';
+	import {
+		connected,
+		connectionError,
+		failedAttempts,
+		tokenNeeded,
+		type ConnectionError
+	} from '$lib/core/ha/connection';
 	import { lang, selectedLanguage, translation } from '$lib/core/i18n';
 	import { states } from '$lib/core/ha/entities';
 	import { startConnection, stopConnection } from '$lib/core/ha/connection';
 	import { setCommandGate } from '$lib/core/ha/commands';
 	import { get } from 'svelte/store';
-	import TokenPrompt from '$lib/Hearth/TokenPrompt.svelte';
 	import ThemeStyle from '$lib/Hearth/shell/ThemeStyle.svelte';
 	import { normalizeHearthConfig } from '$lib/Hearth/normalize';
 	import {
+		configurationLoadError,
 		hearthConfig,
 		hearthLoadError,
+		hearthLoadErrorKind,
 		hearthNeedsSetup,
 		hearthRevision,
 		hearthEditMode
@@ -30,8 +37,25 @@
 
 	let { data }: { data: PageData } = $props();
 
-	let tokenRequired = $state(false);
-	const connectionHooks = { onTokenRequired: () => (tokenRequired = true) };
+	let tokenPromptOpen = $state(false);
+	// opens once when a token becomes necessary; the boot screen button reopens it after a dismiss
+	$effect(() => {
+		if ($tokenNeeded) tokenPromptOpen = true;
+	});
+
+	// attempts run every 3s, so the cause shows after about 6s; that also covers
+	// the HA panel iframe while its parent session is still arriving
+	const STALLED_AFTER_ATTEMPTS = 3;
+	const connectionHints: Record<ConnectionError, string> = {
+		cannot_connect: 'hearth_connection_failed_cannot_connect',
+		https_to_http: 'hearth_connection_failed_https_to_http',
+		panel_auth: 'hearth_connection_failed_panel_auth',
+		invalid_auth: 'hearth_connection_failed_unknown',
+		unknown: 'hearth_connection_failed_unknown'
+	};
+	let stalledError = $derived(
+		$failedAttempts >= STALLED_AFTER_ATTEMPTS ? $connectionError : undefined
+	);
 
 	// one-time store seeding; `data` only changes on a full page load
 	// svelte-ignore state_referenced_locally
@@ -40,6 +64,10 @@
 	$hearthConfig = normalizeHearthConfig(data?.hearth);
 	// svelte-ignore state_referenced_locally
 	$hearthLoadError = data?.hearthError ?? null;
+	// svelte-ignore state_referenced_locally
+	$hearthLoadErrorKind = data?.hearthErrorKind ?? null;
+	// svelte-ignore state_referenced_locally
+	$configurationLoadError = data?.configurationError ?? null;
 	// svelte-ignore state_referenced_locally
 	$hearthNeedsSetup = data?.hearthNeedsSetup ?? false;
 	// svelte-ignore state_referenced_locally
@@ -68,11 +96,11 @@
 	haptics.set(data?.configuration?.haptics === true);
 	const stopPressFeedback = browser ? startPressFeedback() : undefined;
 
-	if (browser) startConnection($configuration, connectionHooks);
+	if (browser) startConnection($configuration);
 
 	// reconnect when a long-lived access token is entered
 	$effect(() => {
-		if ($configuration?.token && browser) startConnection($configuration, connectionHooks);
+		if ($configuration?.token && browser) startConnection($configuration);
 	});
 
 	// taps arrange cards while the layout editor is open and must not reach a device
@@ -97,15 +125,40 @@
 {:else}
 	<ThemeStyle />
 	{#if $configuration?.hassUrl}
-		<section class="boot" aria-live="polite" aria-busy="true">
-			<div class="boot-mark" aria-hidden="true"></div>
-			<strong>
-				{$lang(
-					$connected ? 'hearth_loading_home_assistant' : 'hearth_connecting_to_home_assistant'
-				)}
-			</strong>
-			<span>{$lang('hearth_appears_after_first_snapshot')}</span>
-			<button type="button" onclick={() => (tokenRequired = true)}>{$lang('login')}</button>
+		<section class="boot">
+			{#if !$tokenNeeded && !stalledError}
+				<div class="boot-mark" aria-hidden="true"></div>
+			{/if}
+			<div class="boot-status" role="status">
+				{#if $tokenNeeded}
+					<strong>{$lang('hearth_sign_in_required')}</strong>
+					<span>
+						{$lang(
+							$configuration.token ? 'hearth_token_rejected_hint' : 'hearth_sign_in_token_missing'
+						)}
+					</span>
+				{:else if stalledError}
+					<strong>{$lang('hearth_connection_failed')}</strong>
+					<span>{$lang(connectionHints[stalledError])}</span>
+					<span>{$lang('hearth_connection_retrying')}</span>
+				{:else}
+					<strong>
+						{$lang(
+							$connected ? 'hearth_loading_home_assistant' : 'hearth_connecting_to_home_assistant'
+						)}
+					</strong>
+					<span>{$lang('hearth_appears_after_first_snapshot')}</span>
+				{/if}
+			</div>
+			{#if $tokenNeeded}
+				<button type="button" onclick={() => (tokenPromptOpen = true)}>
+					{$lang('hearth_sign_in')}
+				</button>
+			{:else if stalledError}
+				<button type="button" onclick={() => startConnection($configuration)}>
+					{$lang('hearth_retry')}
+				</button>
+			{/if}
 		</section>
 	{:else}
 		<section class="boot" role="alert">
@@ -115,7 +168,12 @@
 	{/if}
 {/if}
 
-{#if tokenRequired}<TokenPrompt onclose={() => (tokenRequired = false)} />{/if}
+{#if tokenPromptOpen}
+	<!-- only needed when Home Assistant asks for a token, so it loads then -->
+	{#await import('$lib/Hearth/TokenPrompt.svelte') then TokenPrompt}
+		<TokenPrompt.default onclose={() => (tokenPromptOpen = false)} />
+	{/await}
+{/if}
 
 <!-- modules -->
 {#if $configuration?.custom_js}
@@ -138,38 +196,44 @@
 		width: 100%;
 		height: 100dvh;
 		padding: 24px;
-		/* the boot splash shows before ThemeStyle mounts, so no tokens exist yet */
-		background: #16110c; /* literal ok: pre-theme boot splash */
-		color: #f6eee5; /* literal ok: pre-theme boot splash */
-		font-family: 'Hanken Grotesk Variable', sans-serif;
+		background: var(--h-bg-1, #16110c); /* literal ok: fallback if theme tokens are missing */
+		color: var(--h-text-1, #f6eee5); /* literal ok: fallback if theme tokens are missing */
+		font-family: var(--h-font-ui, 'Hanken Grotesk Variable', sans-serif);
 		text-align: center;
 	}
 
 	.boot-mark {
 		width: 36px;
 		height: 36px;
-		border: 3px solid rgba(240, 166, 61, 0.22); /* literal ok: pre-theme boot splash */
-		border-top-color: #f0a63d; /* literal ok: pre-theme boot splash */
+		border: 3px solid rgb(var(--h-accent-rgb, 240 166 61) / calc(0.22 * var(--h-accent-scale, 1)));
+		border-top-color: rgb(var(--h-accent-rgb, 240 166 61));
 		border-radius: 50%;
-		animation: spin 900ms linear infinite;
+		animation: spin 900ms linear infinite; /* literal ok: spinner period, not a transition */
+	}
+
+	.boot-status {
+		display: grid;
+		justify-items: center;
+		gap: 12px;
+		max-width: 480px;
 	}
 
 	.boot strong {
-		font-size: 20px; /* literal ok: pre-theme boot splash */
+		font-size: var(--h-type-title, 20px);
 	}
 
 	.boot span {
-		font-size: 14px; /* literal ok: pre-theme boot splash */
-		color: #a99b8b; /* literal ok: pre-theme boot splash */
+		font-size: var(--h-type-body, 14px);
+		color: var(--h-text-4, #a99b8b); /* literal ok: fallback if theme tokens are missing */
 	}
 
 	.boot button {
-		margin-top: 4px; /* literal ok: pre-theme boot splash */
-		border: 1px solid rgba(240, 166, 61, 0.35); /* literal ok: pre-theme boot splash */
-		border-radius: 12px; /* literal ok: pre-theme boot splash */
-		padding: 10px 18px; /* literal ok: pre-theme boot splash */
+		margin-top: 4px;
+		border: 1px solid rgb(var(--h-accent-rgb, 240 166 61) / calc(0.35 * var(--h-accent-scale, 1)));
+		border-radius: var(--h-radius-xs, 12px);
+		padding: 10px 18px;
 		background: transparent;
-		color: #f0a63d; /* literal ok: pre-theme boot splash */
+		color: var(--h-accent-text, #f0a63d); /* literal ok: fallback if theme tokens are missing */
 		font: inherit;
 		font-weight: 600;
 		cursor: pointer;
@@ -181,9 +245,7 @@
 		}
 	}
 
-	@media (prefers-reduced-motion: reduce) {
-		.boot-mark {
-			animation: none;
-		}
+	:global(html[data-motion='off']) .boot-mark {
+		animation: none;
 	}
 </style>

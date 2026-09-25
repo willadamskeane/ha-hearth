@@ -36,7 +36,11 @@
 	});
 </script>
 
-<TextField label={$lang('hearth_title')} bind:value={title} placeholder="Lights" />
+<TextField
+	label={$lang('hearth_title')}
+	bind:value={title}
+	placeholder={$lang('hearth_example_camera_title')}
+/>
 {#each cameras as row, index (index)}
 	<div class="filter-row">
 		<div class="filter-fields">

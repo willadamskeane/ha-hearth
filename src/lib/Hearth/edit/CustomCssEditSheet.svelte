@@ -1,7 +1,9 @@
 <script lang="ts">
+	import LoadingState from '../LoadingState.svelte';
 	import { onMount } from 'svelte';
 	import { base } from '$app/paths';
 	import { lang } from '$lib/core/i18n';
+	import { customCss } from '$lib/ui/CustomCss.svelte';
 	import { editor } from '../store';
 	import EditSheet from './EditSheet.svelte';
 
@@ -42,8 +44,9 @@
 				error = `${$lang('hearth_save_failed')} [${response.status}]`;
 				return;
 			}
-			// the stylesheet is read once at boot; a reload applies the new file
-			location.reload();
+			// a reload would discard the dashboard draft the edit bar has not saved
+			customCss.set(value);
+			editor.set(null);
 		} catch (failure) {
 			console.error(failure);
 			error = $lang('hearth_save_failed');
@@ -58,9 +61,10 @@
 	onclose={() => editor.set(null)}
 	onback={back}
 	ondone={save}
+	doneLabel={$lang('save')}
 	doneDisabled={!loaded || saving}
 >
-	<div class="hint">{$lang('hearth_custom_css_hint')}</div>
+	<div class="field-hint">{$lang('hearth_custom_css_hint')}</div>
 	<div class="code-workspace">
 		{#if loaded}
 			{#await import('$lib/ui/CodeEditor.svelte') then CodeEditor}
@@ -69,22 +73,17 @@
 					type="css"
 					transitionend={true}
 					onchange={(next) => (value = next)}
+					onsave={save}
 				/>
 			{/await}
 		{:else}
-			<div class="hint">{$lang('hearth_loading')}</div>
+			<LoadingState inline text={$lang('hearth_loading')} />
 		{/if}
 	</div>
 	{#if error}<div class="error" role="alert">{error}</div>{/if}
 </EditSheet>
 
 <style>
-	.hint {
-		font-size: var(--h-type-secondary);
-		color: var(--h-text-6);
-		margin-bottom: 12px;
-	}
-
 	.code-workspace {
 		min-height: 320px;
 	}

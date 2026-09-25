@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { lang } from '$lib/core/i18n';
 	import { ICON } from '../iconSizes';
-	import { hasStripWidgets, isStripWidget } from '../widgets';
+	import { hasStripWidgets, hiddenOnMobile, isStripWidget } from '../widgets';
 	import { enterEditMode, hearthConfig, hearthEditMode, hearthLoadError } from '../store';
 	import Icon from '../Icon.svelte';
 	import RailWidgetRenderer from '../RailWidgetRenderer.svelte';
@@ -16,15 +16,20 @@
 	 * The edit toggle rides at its far end: entering edit mode is rare on a
 	 * wall tablet and should not take a slot from the page tabs. PhoneNav keeps
 	 * it only when there is no strip.
+	 *
+	 * `enabled` is false on a phone held sideways, which has no height for a
+	 * line above the page switcher; the glance widgets then fold into the rail
+	 * runs like any other widget.
 	 */
-	let { hideEditToggle = false }: { hideEditToggle?: boolean } = $props();
+	let { hideEditToggle = false, enabled = true }: { hideEditToggle?: boolean; enabled?: boolean } =
+		$props();
 
 	let widgets = $derived(
-		$hearthConfig.rail.filter((widget) => isStripWidget(widget) && !widget.hide_mobile)
+		$hearthConfig.rail.filter((widget) => isStripWidget(widget) && !hiddenOnMobile(widget))
 	);
 </script>
 
-{#if hasStripWidgets($hearthConfig.rail) && !$hearthEditMode}
+{#if enabled && hasStripWidgets($hearthConfig.rail) && !$hearthEditMode}
 	<div class="status-strip" role="group" aria-label={$lang('hearth_status')}>
 		{#each widgets as widget (widget.id)}
 			<VisibilityGate conditions={widget.visibility}>
@@ -63,7 +68,8 @@
 			   the page down or scrolling it sideways; clip only sideways so the
 			   clock's glyphs and the chip borders are never cut vertically */
 			overflow-x: clip;
-			padding: 8px 2px 0;
+			/* the folded layout leaves the top inset to whatever leads it */
+			padding: calc(8px + env(safe-area-inset-top)) 2px 0;
 			/* the layout's row gap separates page sections; the strip belongs
 			   with the page tabs right under it, 8px away */
 			margin-bottom: -16px;

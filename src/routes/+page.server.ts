@@ -6,7 +6,9 @@ import * as v from 'valibot';
 import type { Translations } from '$lib/core/i18n';
 import { CONFIG_VERSION, configVersion } from '$lib/Hearth/format';
 import { hearthConfigIssues } from '$lib/Hearth/normalize';
+import type { HearthErrorKind } from '$lib/Hearth/store';
 import dotenv from 'dotenv';
+import type { PageServerLoad } from './$types';
 
 dotenv.config({ quiet: true });
 
@@ -28,15 +30,20 @@ async function loadJson(file: string) {
 	}
 }
 
-export async function load({ request }: { request: Request }): Promise<{
+export const load = (async ({
+	request
+}): Promise<{
 	configuration: Configuration;
+	configurationError: string | null;
 	hearth: unknown;
 	hearthError: string | null;
+	hearthErrorKind: HearthErrorKind | null;
 	hearthNeedsSetup: boolean;
 	hearthRevision: number;
 	translations: Translations;
-}> {
+}> => {
 	let configuration: Configuration = { revision: 0 };
+	let configurationError: string | null = null;
 	try {
 		const loaded = await loadYaml('./data/configuration.yaml');
 		if (loaded !== undefined && (!loaded || typeof loaded !== 'object' || Array.isArray(loaded))) {
@@ -46,29 +53,37 @@ export async function load({ request }: { request: Request }): Promise<{
 		configuration.revision ??= 0;
 	} catch (error) {
 		console.error('configuration.yaml could not be read, using defaults:', error);
+		configurationError = error instanceof Error ? error.message : String(error);
 	}
 	let hearth: unknown;
 	let hearthError: string | null = null;
+	let hearthErrorKind: HearthErrorKind | null = null;
 	try {
 		hearth = await loadYaml('./data/hearth.yaml');
 		if (hearth !== undefined && (!hearth || typeof hearth !== 'object' || Array.isArray(hearth))) {
 			hearthError = 'Hearth configuration must contain a YAML mapping';
+			hearthErrorKind = 'unreadable';
 		} else if (
 			hearth !== undefined &&
 			Object.keys(hearth as object).length > 0 &&
 			configVersion(hearth) !== CONFIG_VERSION
 		) {
 			hearthError = `Hearth configuration version ${configVersion(hearth)} is unsupported; expected ${CONFIG_VERSION}`;
+			hearthErrorKind = 'version';
 		}
 	} catch (error) {
 		hearthError =
 			error instanceof Error
 				? `Hearth configuration could not be loaded: ${error.message}`
 				: 'Hearth configuration could not be loaded';
+		hearthErrorKind = 'unreadable';
 	}
 	if (!hearthError && hearth && Object.keys(hearth as object).length > 0) {
 		const issues = hearthConfigIssues(hearth);
-		if (issues.length) hearthError = issues.join('; ');
+		if (issues.length) {
+			hearthError = issues.join('; ');
+			hearthErrorKind = 'invalid';
+		}
 	}
 
 	// the client normalizes whatever it gets; a file that failed above would
@@ -83,12 +98,21 @@ export async function load({ request }: { request: Request }): Promise<{
 			);
 	const hearthNeedsSetup = !hearthError && (hearth === undefined || hearthKeys.length === 0);
 
-	// Production requests receive this private header from server.js. Keep the
-	// environment fallback for the Vite development server, but never expose the
+	// Production requests receive this private header from server.js. Keep a
+	// fallback for the Vite development server, but never expose the
 	// Supervisor-only hostname when the application is running as an add-on.
+	// Without server.js, Ingress uses the browser's HA origin that Supervisor
+	// forwards, and direct access HASS_PUBLIC_URL, then HASS_URL.
+	const source = request.headers.get('x-hass-source');
+	const forwardedProto = request.headers.get('x-forwarded-proto');
+	const forwardedHost = request.headers.get('x-forwarded-host');
 	configuration.hassUrl =
 		request.headers.get('x-hearth-hass-url') ||
-		(process.env.ADDON === 'true' ? undefined : process.env.HASS_URL || undefined);
+		(process.env.ADDON === 'true'
+			? undefined
+			: (source && forwardedProto && forwardedHost
+					? `${forwardedProto}://${forwardedHost}`
+					: process.env.HASS_PUBLIC_URL || process.env.HASS_URL) || undefined);
 	if (request.headers.get('x-hearth-server-auth') === '1') {
 		configuration.serverAuth = true;
 		configuration.hassUrl = '__server_proxy__';
@@ -107,10 +131,12 @@ export async function load({ request }: { request: Request }): Promise<{
 
 	return {
 		configuration,
+		configurationError,
 		hearth,
 		hearthError,
+		hearthErrorKind,
 		hearthNeedsSetup,
 		hearthRevision,
 		translations: locale ? { ...locale, _default: en } : en
 	};
-}
+}) satisfies PageServerLoad;

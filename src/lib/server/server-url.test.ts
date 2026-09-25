@@ -25,6 +25,30 @@ describe('resolvePublicHassUrl', () => {
 		).toBe('https://home.example');
 	});
 
+	it('uses HASS_PUBLIC_URL for direct access but not over Ingress', () => {
+		const environment = {
+			addon: true,
+			hassUrl: 'http://homeassistant:8123',
+			directPublicHassUrl: 'https://ha.example.com'
+		};
+		expect(resolvePublicHassUrl({ host: 'hearth.local:8099' }, environment)).toBe(
+			'https://ha.example.com'
+		);
+		expect(
+			resolvePublicHassUrl(
+				{
+					'x-hass-source': 'core.ingress',
+					'x-forwarded-proto': 'https',
+					'x-forwarded-host': 'example.ui.nabu.casa'
+				},
+				environment
+			)
+		).toBe('https://example.ui.nabu.casa');
+		expect(resolvePublicHassUrl({}, { ...environment, addon: false })).toBe(
+			'https://ha.example.com'
+		);
+	});
+
 	it('derives the browser URL from trusted Supervisor Ingress headers', () => {
 		expect(
 			resolvePublicHassUrl(

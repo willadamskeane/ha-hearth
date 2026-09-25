@@ -5,8 +5,9 @@
 	import { entityState } from '$lib/core/ha/entities';
 	import { getSupport } from '$lib/core/ha/entities';
 	import { PRESS_RIPPLE } from './config';
-	import { callEntityService } from '$lib/core/ha/commands';
-	import { setFanSpeed } from '$lib/core/domains/fan';
+	import { callEntityService, controlOverrides } from '$lib/core/ha/commands';
+	import { fanSpeedForEntity, setFanSpeed } from '$lib/core/domains/fan';
+	import { pressFeedback } from './pressFeedback';
 
 	let { entity }: { entity: string } = $props();
 
@@ -20,15 +21,12 @@
 	let selectedEntity = $derived(entityState(entity));
 	let fan = $derived($selectedEntity);
 	let attributes = $derived(fan?.attributes);
-	let on = $derived(fan?.state === 'on');
-	let speedPct = $derived(on ? Math.round(attributes?.percentage ?? 0) : 0);
+	let speedPct = $derived(fanSpeedForEntity(entity, fan, $controlOverrides));
 	// snap the reported percentage to the nearest segment
 	let active = $derived(
-		on
-			? speeds.reduce((nearest, speed) =>
-					Math.abs(speed.value - speedPct) < Math.abs(nearest.value - speedPct) ? speed : nearest
-				).value
-			: 0
+		speeds.reduce((nearest, speed) =>
+			Math.abs(speed.value - speedPct) < Math.abs(nearest.value - speedPct) ? speed : nearest
+		).value
 	);
 
 	let supports = $derived(
@@ -55,6 +53,7 @@
 			class="segment pressable"
 			class:active={active === speed.value}
 			use:Ripple={PRESS_RIPPLE}
+			use:pressFeedback={entity}
 			onclick={() => setFanSpeed(entity, speed.value)}
 			role="button"
 			tabindex="0"
@@ -73,6 +72,7 @@
 				class="segment pressable"
 				class:active={attributes?.preset_mode === mode}
 				use:Ripple={PRESS_RIPPLE}
+				use:pressFeedback={entity}
 				onclick={() => call('set_preset_mode', { preset_mode: mode })}
 				role="button"
 				tabindex="0"
@@ -92,6 +92,7 @@
 			class="segment pressable"
 			class:active={attributes?.oscillating === true}
 			use:Ripple={PRESS_RIPPLE}
+			use:pressFeedback={entity}
 			onclick={() => call('oscillate', { oscillating: true })}
 			role="button"
 			tabindex="0"
@@ -104,6 +105,7 @@
 			class="segment pressable"
 			class:active={attributes?.oscillating === false}
 			use:Ripple={PRESS_RIPPLE}
+			use:pressFeedback={entity}
 			onclick={() => call('oscillate', { oscillating: false })}
 			role="button"
 			tabindex="0"
@@ -122,6 +124,7 @@
 			class="segment pressable"
 			class:active={attributes?.direction === 'forward'}
 			use:Ripple={PRESS_RIPPLE}
+			use:pressFeedback={entity}
 			onclick={() => call('set_direction', { direction: 'forward' })}
 			role="button"
 			tabindex="0"
@@ -134,6 +137,7 @@
 			class="segment pressable"
 			class:active={attributes?.direction === 'reverse'}
 			use:Ripple={PRESS_RIPPLE}
+			use:pressFeedback={entity}
 			onclick={() => call('set_direction', { direction: 'reverse' })}
 			role="button"
 			tabindex="0"
@@ -150,6 +154,7 @@
 		font-family: var(--h-font-mono);
 		font-size: var(--h-type-label);
 		letter-spacing: 2px;
+		text-transform: uppercase;
 		color: var(--h-label);
 		margin: 22px 0 10px;
 	}

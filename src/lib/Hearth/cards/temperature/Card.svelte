@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { ICON } from '../../iconSizes';
 	import { lang } from '$lib/core/i18n';
-	import { connected } from '$lib/core/ha/connection';
+	import { config, connected } from '$lib/core/ha/connection';
 	import { entityState } from '$lib/core/ha/entities';
 	import type { OverviewCard } from '../../config';
 	import { cachedData, fetchStatisticSeries, startDataRefresh } from '$lib/core/ha/history';
@@ -9,6 +9,7 @@
 	import { controlOverrides } from '$lib/core/ha/commands';
 	import { sensorNumber } from '$lib/core/ha/entities';
 	import { setClimateTemperature } from '$lib/core/domains/climate';
+	import { formatReading } from '../../format';
 	import Icon from '../../Icon.svelte';
 
 	let { card }: { card: Extract<OverviewCard, { type: 'temperature' }> } = $props();
@@ -96,9 +97,7 @@
 		};
 	});
 
-	function formatReading(reading: number) {
-		return reading % 1 === 0 ? String(reading) : reading.toFixed(1);
-	}
+	let temperatureUnit = $derived($config?.unit_system?.temperature ?? '°');
 
 	// gradient ids are per-card: duplicated ids across cards would make every
 	// area fill resolve against whichever card rendered first
@@ -110,14 +109,14 @@
 		<div>
 			<div class="label">{card.label ?? ''}</div>
 			<div class="reading">
-				<span class="value">{value === null ? '-' : value.toFixed(1)}</span>
+				<span class="value">{formatReading(value)}</span>
 				<span class="unit">{card.unit ?? ''}</span>
 			</div>
 		</div>
 		{#if climate && target !== null}
 			<div class="thermostat">
 				<div class="target-label">{$lang('hearth_target')}</div>
-				<div class="target-value">{target.toFixed(1)}°</div>
+				<div class="target-value">{formatReading(target, temperatureUnit)}</div>
 				<div class="target-buttons">
 					<button
 						type="button"
@@ -173,7 +172,7 @@
 			{#if chart.targetY !== null && target !== null}
 				<div class="target-line-label" style:top="{(chart.targetY / CHART_HEIGHT) * 100}%">
 					{$lang('hearth_target')}
-					{target.toFixed(1)}
+					{formatReading(target, temperatureUnit)}
 				</div>
 			{/if}
 		</div>
@@ -193,7 +192,7 @@
 		display: flex;
 		flex-direction: column;
 		gap: 10px;
-		padding: 18px;
+		padding: var(--h-card-padding);
 		border-radius: var(--h-radius-card);
 		background: rgb(var(--h-surface-rgb) / calc(0.045 * var(--h-fill-scale)));
 		backdrop-filter: var(--h-surface-blur);
@@ -242,6 +241,7 @@
 		font-family: var(--h-font-mono);
 		font-size: var(--h-type-caption);
 		letter-spacing: 1.6px;
+		text-transform: uppercase;
 		color: var(--h-text-6);
 	}
 
@@ -294,8 +294,8 @@
 	}
 
 	.verdict[data-tone='poor'] {
-		background: rgb(var(--h-bad-rgb) / 0.13);
-		border: 1px solid rgb(var(--h-bad-rgb) / 0.26);
+		background: rgb(var(--h-bad-rgb) / calc(0.13 * var(--h-accent-scale)));
+		border: 1px solid rgb(var(--h-bad-rgb) / calc(0.26 * var(--h-accent-scale)));
 		color: var(--h-bad-text);
 	}
 
@@ -317,6 +317,7 @@
 		font-family: var(--h-font-mono);
 		font-size: var(--h-type-caption);
 		letter-spacing: 1px;
+		text-transform: uppercase;
 		color: var(--h-label);
 		pointer-events: none;
 	}
@@ -328,6 +329,7 @@
 		font-family: var(--h-font-mono);
 		font-size: var(--h-type-caption);
 		letter-spacing: 1.4px;
+		text-transform: uppercase;
 		color: var(--h-text-6);
 	}
 </style>
