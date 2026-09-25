@@ -176,7 +176,7 @@
 	 * hand the name to assistive technology instead of dropping it. See
 	 * breakpoints.ts.
 	 */
-	@media (max-width: 900px) and (max-height: 500px) and (orientation: landscape) {
+	@media (max-width: 900px) and (max-height: 440px) and (orientation: landscape) {
 		.page:not(.active) {
 			width: 44px;
 			padding: 0;

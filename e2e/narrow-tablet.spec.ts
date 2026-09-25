@@ -73,3 +73,15 @@ test('?perf=1 shows the diagnostics overlay; it is off by default', async ({ pag
 	await page.getByRole('button', { name: /Desk lamp/ }).click();
 	await expect(page.locator('.perf-hud')).toContainText(/taps \d+/, { timeout: 5000 });
 });
+
+test.describe('a small wall tablet', () => {
+	// the 1280x800 ThinkSmart View's CSS viewport: short, but not a phone held sideways
+	test.use({ viewport: { width: 788, height: 492 } });
+
+	test('keeps the status strip instead of folding its widgets into the page', async ({ page }) => {
+		await page.goto('/');
+		await expect(page.getByRole('button', { name: /Desk lamp/ })).toBeVisible();
+		await expect(page.getByRole('group', { name: 'Status' })).toBeInViewport();
+		await expect(page.locator('.rail-run')).toHaveCount(0);
+	});
+});
