@@ -84,4 +84,13 @@ test.describe('a small wall tablet', () => {
 		await expect(page.getByRole('group', { name: 'Status' })).toBeInViewport();
 		await expect(page.locator('.rail-run')).toHaveCount(0);
 	});
+
+	test('adds no gutter beyond the configured side padding', async ({ page }) => {
+		await page.goto('/');
+		await expect(page.getByRole('button', { name: /Desk lamp/ })).toBeVisible();
+		// the fixture sets no padding_x, so the page runs to the screen edges
+		const layout = page.locator('.layout.narrow');
+		await expect(layout).toHaveCSS('padding-left', '0px');
+		await expect(layout).toHaveCSS('padding-right', '0px');
+	});
 });

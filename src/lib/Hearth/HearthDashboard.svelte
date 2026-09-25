@@ -535,12 +535,12 @@
 	.layout.narrow {
 		display: flex;
 		flex-direction: column;
-		/* the same shape as the wide layout's padding: a base the user's own
-		   padding adds to, plus the device's safe area, which a landscape notch
-		   makes a horizontal concern too. Published so the page switcher can
-		   bleed back out to the screen edge. */
-		--h-fold-pad-left: calc(16px + var(--h-pad-x) + env(safe-area-inset-left));
-		--h-fold-pad-right: calc(16px + var(--h-pad-x) + env(safe-area-inset-right));
+		/* edge to edge: only the user's own padding plus the device's safe
+		   area, which a landscape notch makes a horizontal concern too - a
+		   narrow screen has no width to spend on a fixed gutter. Published so
+		   the page switcher can bleed back out to the screen edge. */
+		--h-fold-pad-left: calc(var(--h-pad-x) + env(safe-area-inset-left));
+		--h-fold-pad-right: calc(var(--h-pad-x) + env(safe-area-inset-right));
 		/* no padding above: the page switcher pins to the very top of this
 		   scroller and carries the top inset itself, so nothing can scroll
 		   through the strip of screen above it */
