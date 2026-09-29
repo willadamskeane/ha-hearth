@@ -94,3 +94,23 @@ test.describe('a small wall tablet', () => {
 		await expect(layout).toHaveCSS('padding-right', '0px');
 	});
 });
+
+test('the page tabs scroll to the screen edge instead of clipping inside the side padding', async ({
+	page
+}) => {
+	await page.setViewportSize({ width: 788, height: 492 });
+	await page.goto('/');
+	await expect(page.getByRole('button', { name: /Desk lamp/ })).toBeVisible();
+	await page.addStyleTag({ content: ':root, :root * { --h-pad-x: 24px !important; }' });
+	const nav = page.getByRole('navigation', { name: 'Pages' });
+	const box = (await nav.locator('.pages').boundingBox())!;
+	// the scroller itself starts at the screen edge...
+	expect(box.x).toBeLessThanOrEqual(1);
+	// ...and its padding keeps the first tab lined up with the cards
+	const first = (await nav.locator('.page').first().boundingBox())!;
+	expect(first.x).toBeGreaterThanOrEqual(24);
+	// without buttons after it, it also runs to the right edge
+	if ((await nav.locator('.search, .edit').count()) === 0) {
+		expect(box.x + box.width).toBeGreaterThanOrEqual(787);
+	}
+});

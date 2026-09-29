@@ -112,10 +112,12 @@
 			margin: 0 calc(-1 * var(--h-fold-pad-right, var(--h-pad-x))) 0
 				calc(-1 * var(--h-fold-pad-left, var(--h-pad-x)));
 			/* the layout leaves no room above the strip, so the top inset is the
-			   strip's to carry; the sides match the layout's own padding so the
-			   pills line up with the cards under them */
-			padding: calc(8px + env(safe-area-inset-top)) var(--h-fold-pad-right, var(--h-pad-x)) 8px
-				var(--h-fold-pad-left, var(--h-pad-x));
+			   strip's to carry. The sides carry only the notch inset: the pills
+			   scroll all the way to the screen edge, and the layout's padding
+			   lives inside the scroller (.pages) so the first pill still lines up
+			   with the cards under it */
+			padding: calc(8px + env(safe-area-inset-top)) env(safe-area-inset-right) 8px
+				env(safe-area-inset-left);
 			/* opaque: the page passing behind a translucent strip shows through
 			   the pills, which reads as a smudge */
 			background: var(--h-bg-1);
@@ -128,7 +130,18 @@
 			scrollbar-width: none;
 			flex: 1;
 			min-width: 0;
-			padding: 2px;
+			padding: 2px var(--h-pad-x);
+			scroll-padding-inline: var(--h-pad-x);
+		}
+
+		/* search and edit buttons follow: they carry the right padding */
+		.pages:not(:last-child) {
+			padding-right: 2px;
+		}
+
+		.search:last-child,
+		.edit:last-child {
+			margin-right: var(--h-pad-x);
 		}
 
 		.pages::-webkit-scrollbar {
