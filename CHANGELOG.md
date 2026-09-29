@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.26
+
+- The page tabs on narrow screens scroll to the screen edge instead of being clipped by the layout's side padding; the padding now sits inside the scroller so the first tab still lines up with the cards.
+
 ## 0.1.25
 
 - Thermostat +/- taps only move the shown target; one `set_temperature` call with the final value goes out 1.5 s after the last tap, so cloud thermostats such as Nest are not rate limited. The climate card and the detail dialog share this.
