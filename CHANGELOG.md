@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.25
+
+- Thermostat +/- taps only move the shown target; one `set_temperature` call with the final value goes out 1.5 s after the last tap, so cloud thermostats such as Nest are not rate limited. The climate card and the detail dialog share this.
+- Thermostats that report no `target_temp_step` move in whole degrees instead of 0.5.
+
 ## 0.1.24
 
 - Drop the extra 16 px side gutter the upstream merge added on narrow screens; they use only the configured side padding plus the device's safe area again.
