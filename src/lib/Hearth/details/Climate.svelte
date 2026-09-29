@@ -12,7 +12,7 @@
 	let selectedEntity = $derived(entityState(entity));
 	let stateObj = $derived($selectedEntity);
 	let attributes = $derived(stateObj?.attributes ?? {});
-	let step = $derived<number>(attributes.target_temp_step ?? 0.5);
+	let step = $derived<number>(attributes.target_temp_step ?? 1);
 	let min = $derived<number>(attributes.min_temp ?? 7);
 	let max = $derived<number>(attributes.max_temp ?? 35);
 	let unit = $derived($config?.unit_system?.temperature ?? '°');

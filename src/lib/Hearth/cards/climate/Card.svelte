@@ -38,7 +38,8 @@
 		typeof attributes.current_temperature === 'number' ? attributes.current_temperature : null
 	);
 	let target = $derived(typeof attributes.temperature === 'number' ? attributes.temperature : null);
-	let step = $derived(attributes.target_temp_step ?? 0.5);
+	// devices that report no step (Nest) move in whole degrees
+	let step = $derived(attributes.target_temp_step ?? 1);
 	let hvacModes = $derived<string[]>(
 		Array.isArray(attributes.hvac_modes) ? attributes.hvac_modes : []
 	);
